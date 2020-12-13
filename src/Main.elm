@@ -20,6 +20,8 @@ import Browser
 import Browser.Events
 import Json.Decode as Decode
 import Quantity
+import Level exposing (Level)
+import Level.Level1 as Level1
 
 type PlayerBlock = PlayerBlock BlockOrientation (Int, Int)
 
@@ -40,20 +42,6 @@ type Direction
     | Down
 
 
-type LevelTile
-    = Empty
-    | Floor
-    | Finish
-
-
-type alias Position = (Int, Int)
-
-
-type alias Level =
-    { tiles: Array (Array LevelTile)
-    , startingPosition: Position
-    }
-
 
 type alias Model =
     { player: PlayerBlock
@@ -71,11 +59,8 @@ tileSize = Length.centimeters 1
 
 init : () -> (Model, Cmd Msg)
 init flags =
-    ( { player = PlayerBlock Standing (0, 0)
-      , level =
-        { tiles = Array.fromList [Array.fromList []]
-        , startingPosition = (0, 0)
-        }
+    ( { player = PlayerBlock Standing Level1.data.startingPosition
+      , level = Level1.data
       , control = Nothing
       }
     , Cmd.none
@@ -212,7 +197,7 @@ view { player, level } =
                 }
     in
     Scene3d.sunny
-        { entities = [ playerEntity player ]
+        { entities = [ playerEntity player, levelEntity level ]
         , camera = camera
         , upDirection = Direction3d.z
         , sunlightDirection = Direction3d.yz (Angle.degrees -120)
@@ -240,6 +225,46 @@ bottomAxis =
 leftAxis =
     Axis3d.through (Point3d.centimeters 0 0 0) Direction3d.x
 
+levelEntity { tiles } =
+    tiles
+        |> Array.indexedMap
+            ( \x row ->
+                Array.indexedMap
+                    ( \y tile ->
+                      case tile of
+                          Level.Floor ->
+                            floorEntity Color.gray (x, y)
+
+                          Level.Empty ->
+                            Scene3d.nothing
+
+                          Level.Finish ->
+                            floorEntity Color.black (x, y)
+
+                    )
+                    row
+                |> Array.toList
+            )
+        |> Array.toList
+        |> List.concatMap identity
+        |> Scene3d.group
+
+floorEntity color (x, y) =
+    let
+        tileBorderSizeCm = tileSizeCm * 0.02
+    in
+      Scene3d.block
+            ( Material.matte color )
+            (
+                Block3d.with
+                    { x1 = Length.centimeters (tileSizeCm * toFloat x + tileBorderSizeCm)
+                    , x2 = Length.centimeters (tileSizeCm * toFloat (x + 1) - tileBorderSizeCm)
+                    , y1 = Length.centimeters (tileSizeCm * toFloat y + tileBorderSizeCm)
+                    , y2 = Length.centimeters (tileSizeCm * toFloat (y + 1) - tileBorderSizeCm)
+                    , z1 = Length.centimeters 0
+                    , z2 = Length.centimeters (tileSizeCm * 0.1)
+                    }
+            )
 
 playerEntity (PlayerBlock orientation (x, y)) =
     let
