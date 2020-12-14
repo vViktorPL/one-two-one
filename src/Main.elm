@@ -29,9 +29,10 @@ type PlayerBlock = PlayerBlock BlockOrientation (Int, Int)
 type BlockOrientation
     = Standing
     | Lying Direction
-    | Falling Direction Float
+    | KnockingOver Direction Float
     | GettingUp Direction Float
     | Rolling Direction Float
+    | Falling Float
 
 
 
@@ -81,7 +82,7 @@ animationSpeed = 1 / 250
 animatePlayer : Float -> PlayerBlock -> PlayerBlock
 animatePlayer delta player =
     case player of
-        PlayerBlock (Falling direction progress) (x, y) ->
+        PlayerBlock (KnockingOver direction progress) (x, y) ->
             let
                 newProgress = progress + delta * animationSpeed
             in
@@ -96,7 +97,7 @@ animatePlayer delta player =
                         )
                     )
                 else
-                    PlayerBlock (Falling direction newProgress) (x, y)
+                    PlayerBlock (KnockingOver direction newProgress) (x, y)
 
         PlayerBlock (GettingUp direction progress) (x, y) ->
             let
@@ -123,16 +124,39 @@ animatePlayer delta player =
                 else
                     PlayerBlock (Rolling direction newProgress) (x, y)
 
+        PlayerBlock (Falling progress) (x, y) ->
+            let
+               newProgress = progress + delta * animationSpeed
+            in
+                PlayerBlock (Falling newProgress) (x, y)
+
         a -> a
 
+
+restartPlayer : Level -> PlayerBlock
+restartPlayer { startingPosition } = PlayerBlock Standing startingPosition
+
+getPlayerPosition : PlayerBlock -> (Int, Int)
+getPlayerPosition (PlayerBlock _ position) =
+    position
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
         Tick delta ->
-            ({ model | player = model.player |> controlPlayer model.control |> animatePlayer delta }
-            , Cmd.none
-            )
+            let
+                updatedPlayer = model.player |> controlPlayer model.control |> animatePlayer delta
+            in
+                ({ model | player =
+                    if shouldDie model.level updatedPlayer then
+                        restartPlayer model.level
+                    else if isLevelCompleted model then
+                        PlayerBlock (Falling 0) (getPlayerPosition updatedPlayer)
+                    else
+                        updatedPlayer
+                }
+                , Cmd.none
+                )
 
         KeyDown key ->
             ( key
@@ -189,7 +213,7 @@ view { player, level } =
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.lookAt
-                        { focalPoint = Point3d.origin
+                        { focalPoint = Point3d.centimeters 5 5 0
                         , eyePoint = Point3d.centimeters 20 10 15
                         , upDirection = Direction3d.z
                         }
@@ -274,7 +298,7 @@ playerEntity (PlayerBlock orientation (x, y)) =
 
         block =
             Scene3d.block
-                ( Material.matte Color.lightGreen)
+                ( Material.metal { baseColor = Color.orange, roughness = 2.5 } )
                 (
                     Block3d.with
                         { x1 = Length.centimeters 0
@@ -321,19 +345,19 @@ playerEntity (PlayerBlock orientation (x, y)) =
                    |> Scene3d.translateIn Direction3d.y tileSize
 
 
-           Falling Up progress ->
+           KnockingOver Up progress ->
                 block
                     |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
 
-           Falling Right progress ->
+           KnockingOver Right progress ->
                 block
                     |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
 
-           Falling Down progress ->
+           KnockingOver Down progress ->
                 block
                     |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
 
-           Falling Left progress ->
+           KnockingOver Left progress ->
                 block
                     |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
 
@@ -377,6 +401,9 @@ playerEntity (PlayerBlock orientation (x, y)) =
                     |> Scene3d.translateIn Direction3d.negativeY tileSize
                     |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
 
+           Falling progress ->
+                block
+                    |> Scene3d.translateIn Direction3d.negativeZ (Length.meters (progress * progress * 0.01))
        )
            |> Scene3d.translateBy
                 (Vector3d.centimeters positionX positionY 0)
@@ -392,7 +419,7 @@ controlPlayer maybeDirection (PlayerBlock orientation (x, y)) =
             (\direction ->
                 case (orientation, direction) of
                     (Standing, fallDirection) ->
-                        PlayerBlock (Falling fallDirection 0) (x, y)
+                        PlayerBlock (KnockingOver fallDirection 0) (x, y)
 
                     -- Lying up
                     (Lying Up, Left) ->
@@ -451,3 +478,39 @@ controlPlayer maybeDirection (PlayerBlock orientation (x, y)) =
                         PlayerBlock orientation (x, y)
             )
         |> Maybe.withDefault (PlayerBlock orientation (x, y))
+
+isLevelCompleted : Model -> Bool
+isLevelCompleted { level, player } =
+    case player of
+        PlayerBlock Standing (x, y) ->
+            Level.getTileAt level (x, y) == Level.Finish
+        _ ->
+            False
+
+
+
+shouldDie : Level -> PlayerBlock -> Bool
+shouldDie level player =
+    case player of
+        PlayerBlock Standing (x, y) -> Level.getTileAt level (x, y) == Level.Empty
+        PlayerBlock (Lying Left) (x, y) ->
+            Level.getTileAt level (x, y - 1) == Level.Empty
+            ||
+            Level.getTileAt level (x, y) == Level.Empty
+
+        PlayerBlock (Lying Up) (x, y) ->
+            Level.getTileAt level (x - 1, y) == Level.Empty
+            ||
+            Level.getTileAt level (x, y) == Level.Empty
+
+        PlayerBlock (Lying Right) (x, y) ->
+            Level.getTileAt level (x, y) == Level.Empty
+            ||
+            Level.getTileAt level (x, y + 1) == Level.Empty
+
+        PlayerBlock (Lying Down) (x, y) ->
+            Level.getTileAt level (x, y) == Level.Empty
+            ||
+            Level.getTileAt level (x + 1, y) == Level.Empty
+
+        _ -> False
