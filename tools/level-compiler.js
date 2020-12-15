@@ -5,9 +5,11 @@ const levelsPath = path.join(__dirname, '../levels');
 const outputPath = path.join(__dirname, '../src/Level');
 
 fs.readdir(path.join(__dirname, '../levels')).then(
-  files => files
-    .filter(filename => filename.split('.').pop() === "txt")
-    .forEach(filename => {
+  files => {
+    const levelFiles = files.filter(filename => filename.split('.').pop() === "txt");
+    const levelModules = levelFiles.map(levelFilename => `Level.${levelFilename.replace('.txt', '')}`);
+
+    levelFiles.forEach(filename => {
       fs.readFile(path.join(levelsPath, filename)).then(
         content => {
           const outputFilePath = path.join(outputPath, filename.replace('.txt', '.elm'));
@@ -37,7 +39,24 @@ fs.readdir(path.join(__dirname, '../levels')).then(
           fs.writeFile(outputFilePath, code);
         }
       )
-    })
+    });
+
+    const levelsData = levelModules.map(levelModule => `${levelModule}.data`);
+
+    fs.writeFile(path.join(outputPath, "Index.elm"), [
+      'module Level.Index exposing (firstLevel, restLevels)',
+      '',
+      'import Level exposing (Level)',
+      ...levelModules.map(levelModule => `import ${levelModule}`),
+      '',
+      '',
+      'firstLevel : Level',
+      `firstLevel = ${levelsData[0]}`,
+      '',
+      'restLevels : List Level',
+      `restLevels = [${levelsData.slice(1).join(', ')}]`,
+    ].join('\n'));
+  }
 );
 
 
