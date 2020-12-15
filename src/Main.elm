@@ -306,8 +306,8 @@ floorEntity color (x, y) =
                     , x2 = Length.centimeters (tileSizeCm * toFloat (x + 1) - tileBorderSizeCm)
                     , y1 = Length.centimeters (tileSizeCm * toFloat y + tileBorderSizeCm)
                     , y2 = Length.centimeters (tileSizeCm * toFloat (y + 1) - tileBorderSizeCm)
-                    , z1 = Length.centimeters 0
-                    , z2 = Length.centimeters (tileSizeCm * 0.1)
+                    , z1 = Length.centimeters (tileSizeCm * -0.1)
+                    , z2 = Length.centimeters 0
                     }
             )
 
