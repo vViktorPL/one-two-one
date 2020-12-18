@@ -1,9 +1,5 @@
 module Screen.Game.Level.Level3 exposing (data)
-import Array exposing (fromList)
-import Screen.Game.Level exposing (Level, LevelTile(..))
+import Screen.Game.Level exposing (Level, LevelTile(..), fromData)
 
 data : Level
-data = 
-  { tiles = fromList [fromList [Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor],fromList [Floor,Floor,Floor,Floor,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor],fromList [Floor,Floor,Floor,Floor,Floor,Floor,Empty,Empty,Empty,Empty,Floor,Floor],fromList [Empty,Floor,Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor,Floor,Floor],fromList [Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Finish,Floor,Floor],fromList [Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor,Floor],fromList []]
-  , startingPosition = (1, 1)
-  }
+data = fromData [[Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor],[Floor,Floor,Floor,Floor,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor],[Floor,Floor,Floor,Floor,Floor,Floor,Empty,Empty,Empty,Empty,Floor,Floor],[Empty,Floor,Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Finish,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor,Floor],[]] (1, 1)

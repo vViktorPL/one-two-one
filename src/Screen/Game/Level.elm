@@ -1,4 +1,4 @@
-module Screen.Game.Level exposing (Level, LevelTile(..), getTileAt, view)
+module Screen.Game.Level exposing (Level, LevelTile(..), fromData, getStartingPosition, getTileAt, view)
 
 import Array exposing (Array)
 import Block3d
@@ -15,20 +15,38 @@ type LevelTile
     | Finish
 
 
-type alias Level =
-    { tiles : Array (Array LevelTile)
-    , startingPosition : ( Int, Int )
-    }
+type Level
+    = Level
+        { tiles : Array (Array LevelTile)
+        , startingPosition : ( Int, Int )
+        }
+
+
+fromData : List (List LevelTile) -> ( Int, Int ) -> Level
+fromData tiles startingPosition =
+    Level
+        { tiles =
+            tiles
+                |> List.map Array.fromList
+                |> Array.fromList
+        , startingPosition = startingPosition
+        }
+
+
+getStartingPosition : Level -> ( Int, Int )
+getStartingPosition (Level { startingPosition }) =
+    startingPosition
 
 
 getTileAt : Level -> ( Int, Int ) -> LevelTile
-getTileAt { tiles } ( x, y ) =
+getTileAt (Level { tiles }) ( x, y ) =
     Array.get x tiles
         |> Maybe.map (\row -> Array.get y row |> Maybe.withDefault Empty)
         |> Maybe.withDefault Empty
 
 
-view { tiles } =
+view : Level -> Scene3d.Entity coordinates
+view (Level { tiles }) =
     tiles
         |> Array.indexedMap
             (\x row ->

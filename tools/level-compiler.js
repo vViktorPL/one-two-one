@@ -16,9 +16,9 @@ fs.readdir(path.join(__dirname, '../levels')).then(
           const rows = String(content).split('\n');
 
           const tileRows = rows.map(
-            row => `fromList [${[...row].map(asciiToTile).join(',')}]`
+            row => `[${[...row].map(asciiToTile).join(',')}]`
           );
-          const tiles = `fromList [${tileRows.join(',')}]`;
+          const tiles = `[${tileRows.join(',')}]`;
 
 
           const startingPosX = rows.findIndex(row => row.includes('S'));
@@ -26,14 +26,10 @@ fs.readdir(path.join(__dirname, '../levels')).then(
 
           const code = [
             `module Screen.Game.Level.${filename.replace(".txt", "")} exposing (data)`,
-            'import Array exposing (fromList)',
-            'import Screen.Game.Level exposing (Level, LevelTile(..))',
+            'import Screen.Game.Level exposing (Level, LevelTile(..), fromData)',
             '',
             'data : Level',
-            'data = ',
-            `  { tiles = ${tiles}`,
-            `  , startingPosition = (${startingPosX}, ${startingPosY})`,
-            '  }',
+            `data = fromData ${tiles} (${startingPosX}, ${startingPosY})`,
           ].join('\n');
 
           fs.writeFile(outputFilePath, code);

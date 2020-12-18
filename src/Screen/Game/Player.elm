@@ -104,6 +104,7 @@ update delta player =
             a
 
 
+view : Player -> Scene3d.Entity coordinates
 view (Player orientation ( x, y )) =
     let
         positionX =

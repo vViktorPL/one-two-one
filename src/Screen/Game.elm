@@ -44,7 +44,7 @@ type MsgOut
 init : Game
 init =
     Game
-        { player = Player.init LevelIndex.firstLevel.startingPosition
+        { player = Player.init (Level.getStartingPosition LevelIndex.firstLevel)
         , level = LevelIndex.firstLevel
         , levelsLeft = LevelIndex.restLevels
         , control = Nothing
@@ -86,7 +86,7 @@ update msg (Game game) =
                     Player.hasSlidedIn updatedPlayer
             in
             if fail then
-                ( Game { game | player = Player.init game.level.startingPosition }, NoOp )
+                ( Game { game | player = Player.init (Level.getStartingPosition game.level) }, NoOp )
 
             else if success then
                 ( Game { game | player = Player.slideIn updatedPlayer }, NoOp )
@@ -95,7 +95,7 @@ update msg (Game game) =
                 case game.levelsLeft of
                     nextLevel :: rest ->
                         ( Game
-                            { player = Player.init nextLevel.startingPosition
+                            { player = Player.init (Level.getStartingPosition nextLevel)
                             , level = nextLevel
                             , levelsLeft = rest
                             , control = Nothing
