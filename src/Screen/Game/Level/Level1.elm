@@ -1,6 +1,6 @@
-module Level.Level1 exposing (data)
+module Screen.Game.Level.Level1 exposing (data)
 import Array exposing (fromList)
-import Level exposing (Level, LevelTile(..))
+import Screen.Game.Level exposing (Level, LevelTile(..))
 
 data : Level
 data = 

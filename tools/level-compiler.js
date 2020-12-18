@@ -2,12 +2,12 @@ const fs = require('fs').promises;
 const path = require('path');
 
 const levelsPath = path.join(__dirname, '../levels');
-const outputPath = path.join(__dirname, '../src/Level');
+const outputPath = path.join(__dirname, '../src/Screen/Game/Level');
 
 fs.readdir(path.join(__dirname, '../levels')).then(
   files => {
     const levelFiles = files.filter(filename => filename.split('.').pop() === "txt");
-    const levelModules = levelFiles.map(levelFilename => `Level.${levelFilename.replace('.txt', '')}`);
+    const levelModules = levelFiles.map(levelFilename => `Screen.Game.Level.${levelFilename.replace('.txt', '')}`);
 
     levelFiles.forEach(filename => {
       fs.readFile(path.join(levelsPath, filename)).then(
@@ -25,9 +25,9 @@ fs.readdir(path.join(__dirname, '../levels')).then(
           const startingPosY = rows[startingPosX].indexOf("S");
 
           const code = [
-            `module Level.${filename.replace(".txt", "")} exposing (data)`,
+            `module Screen.Game.Level.${filename.replace(".txt", "")} exposing (data)`,
             'import Array exposing (fromList)',
-            'import Level exposing (Level, LevelTile(..))',
+            'import Screen.Game.Level exposing (Level, LevelTile(..))',
             '',
             'data : Level',
             'data = ',
@@ -44,9 +44,9 @@ fs.readdir(path.join(__dirname, '../levels')).then(
     const levelsData = levelModules.map(levelModule => `${levelModule}.data`);
 
     fs.writeFile(path.join(outputPath, "Index.elm"), [
-      'module Level.Index exposing (firstLevel, restLevels)',
+      'module Screen.Game.Level.Index exposing (firstLevel, restLevels)',
       '',
-      'import Level exposing (Level)',
+      'import Screen.Game.Level exposing (Level)',
       ...levelModules.map(levelModule => `import ${levelModule}`),
       '',
       '',
