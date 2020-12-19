@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node tools/level-compiler.js && elm make src/Main.elm --output=build/index.html --optimize"
+    "build": "node tools/level-compiler.js && elm make src/Main.elm --output=build/app.js --optimize && cp public/index.html build/ && bestzip build.zip build"
   },
   "repository": {
     "type": "git",
@@ -16,5 +16,9 @@
   "bugs": {
     "url": "https://github.com/vViktorPL/one-two-one/issues"
   },
-  "homepage": "https://github.com/vViktorPL/one-two-one#readme"
+  "homepage": "https://github.com/vViktorPL/one-two-one#readme",
+  "dependencies": {},
+  "devDependencies": {
+    "bestzip": "^2.1.7"
+  }
 }
