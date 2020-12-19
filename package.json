@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "node tools/level-compiler.js"
+    "build": "node tools/level-compiler.js && elm make src/Main.elm --output=build/index.html --optimize"
   },
   "repository": {
     "type": "git",

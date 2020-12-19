@@ -187,7 +187,7 @@ view (Game { player, level }) =
         , background = Scene3d.transparentBackground
         , clipDepth = Length.centimeters 1
         , shadows = False
-        , dimensions = ( Pixels.int 400, Pixels.int 300 )
+        , dimensions = ( Pixels.int 800, Pixels.int 600 )
         }
 
 
