@@ -65,6 +65,9 @@ const asciiToTile = ascii => {
     case "F":
       return "Finish";
 
+    case 'R':
+      return "RustyFloor";
+
     default:
       return "Empty";
   }

@@ -30,11 +30,14 @@ type BlockAnimationState
     | FallingInHorizontalOrientation Direction Float
     | FallingInVerticalOrientation { zOffset : Length, progress : Float }
     | FallingFromTheSky Float
+    | FallingWithTheFloor Float
 
 
 type InteractionMsg
     = InternalUpdate
     | FinishedLevel
+    | PushDownTile Length
+    | RestartedLevel
 
 
 init : ( Int, Int ) -> Player
@@ -158,6 +161,13 @@ update delta player =
 
             else
                 Player (FallingFromTheSky newProgress) ( x, y )
+
+        Player (FallingWithTheFloor progress) ( x, y ) ->
+            let
+                newProgress =
+                    progress + delta * Constant.animationSpeed * min (progress + 1) 5
+            in
+            Player (FallingWithTheFloor newProgress) ( x, y )
 
         a ->
             a
@@ -341,6 +351,10 @@ view (Player orientation ( x, y )) =
         FallingFromTheSky progress ->
             block
                 |> Scene3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
+
+        FallingWithTheFloor progress ->
+            block
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
     )
         |> Scene3d.translateBy
             (Vector3d.centimeters positionX positionY 0)
@@ -526,6 +540,17 @@ interact level ((Player state ( x, y )) as player) =
         ( [ _, Level.Empty ], Lying Direction.Down ) ->
             ( fall (Just Direction.Down) player, InternalUpdate )
 
+        -- Stomp on rusty tile
+        ( [ Level.RustyFloor ], Standing ) ->
+            ( Player (FallingWithTheFloor 0) ( x, y ), InternalUpdate )
+
+        ( [], FallingWithTheFloor progress ) ->
+            if progress >= 30 then
+                ( init (Level.getStartingPosition level), RestartedLevel )
+
+            else
+                ( player, PushDownTile (Length.centimeters progress) )
+
         -- Success
         ( [ Level.Finish ], _ ) ->
             ( Player (SlideIn 0) ( x, y ), InternalUpdate )
@@ -542,14 +567,14 @@ interact level ((Player state ( x, y )) as player) =
         -- Restart
         ( [], FallingInHorizontalOrientation _ progress ) ->
             if progress >= 30 then
-                ( init (Level.getStartingPosition level), InternalUpdate )
+                ( init (Level.getStartingPosition level), RestartedLevel )
 
             else
                 ( player, InternalUpdate )
 
         ( [], FallingInVerticalOrientation { progress } ) ->
             if progress >= 30 then
-                ( init (Level.getStartingPosition level), InternalUpdate )
+                ( init (Level.getStartingPosition level), RestartedLevel )
 
             else
                 ( player, InternalUpdate )

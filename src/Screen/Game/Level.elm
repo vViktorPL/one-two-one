@@ -1,9 +1,11 @@
-module Screen.Game.Level exposing (Level, LevelTile(..), fromData, getStartingPosition, getTileAt, view)
+module Screen.Game.Level exposing (Level, LevelTile(..), fromData, getStartingPosition, getTileAt, restart, shiftTile, view)
 
 import Array exposing (Array)
 import Block3d
 import Color
-import Length
+import Dict exposing (Dict)
+import Direction3d
+import Length exposing (Length)
 import Scene3d
 import Scene3d.Material as Material
 import Screen.Game.Constant
@@ -12,12 +14,18 @@ import Screen.Game.Constant
 type LevelTile
     = Empty
     | Floor
+    | RustyFloor
     | Finish
+
+
+type TileState
+    = PushDown Length
 
 
 type Level
     = Level
         { tiles : Array (Array LevelTile)
+        , tileStates : Dict ( Int, Int ) TileState
         , startingPosition : ( Int, Int )
         }
 
@@ -29,6 +37,7 @@ fromData tiles startingPosition =
             tiles
                 |> List.map Array.fromList
                 |> Array.fromList
+        , tileStates = Dict.empty
         , startingPosition = startingPosition
         }
 
@@ -45,8 +54,18 @@ getTileAt (Level { tiles }) ( x, y ) =
         |> Maybe.withDefault Empty
 
 
+shiftTile : ( Int, Int ) -> Length -> Level -> Level
+shiftTile location zOffset (Level level) =
+    Level { level | tileStates = Dict.insert location (PushDown zOffset) level.tileStates }
+
+
+restart : Level -> Level
+restart (Level level) =
+    Level { level | tileStates = Dict.empty }
+
+
 view : Level -> Scene3d.Entity coordinates
-view (Level { tiles }) =
+view (Level { tiles, tileStates }) =
     tiles
         |> Array.indexedMap
             (\x row ->
@@ -61,6 +80,16 @@ view (Level { tiles }) =
 
                             Finish ->
                                 floorEntity Color.black ( x, y )
+
+                            RustyFloor ->
+                                floorEntity Color.lightOrange ( x, y )
+                                    |> (case Dict.get ( x, y ) tileStates of
+                                            Just (PushDown zOffset) ->
+                                                Scene3d.translateIn Direction3d.negativeZ zOffset
+
+                                            _ ->
+                                                identity
+                                       )
                     )
                     row
                     |> Array.toList

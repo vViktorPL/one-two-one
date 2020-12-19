@@ -91,6 +91,24 @@ update msg (Game game) =
                         [] ->
                             ( Game game, GameFinished )
 
+                Player.PushDownTile zOffset ->
+                    ( Game
+                        { game
+                            | player = updatedPlayer
+                            , level = Level.shiftTile (Player.getPosition updatedPlayer) zOffset game.level
+                        }
+                    , NoOp
+                    )
+
+                Player.RestartedLevel ->
+                    ( Game
+                        { game
+                            | player = updatedPlayer
+                            , level = Level.restart game.level
+                        }
+                    , NoOp
+                    )
+
         KeyDown key ->
             ( key
                 |> keyToDirection
