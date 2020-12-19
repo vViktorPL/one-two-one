@@ -516,6 +516,9 @@ interact level ((Player state ( x, y )) as player) =
         ( [ Level.Empty ], _ ) ->
             ( fall Nothing player, InternalUpdate )
 
+        ( [ Level.Empty, Level.Empty ], _ ) ->
+            ( fall Nothing player, InternalUpdate )
+
         ( [ Level.Empty, _ ], Lying Direction.Left ) ->
             ( fall (Just Direction.Left) player, InternalUpdate )
 
