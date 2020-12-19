@@ -79,6 +79,7 @@ update msg (Game game) =
                 fail =
                     List.any ((==) Level.Empty) occupiedTiles
 
+                -- TODO refactor this to player module, perhaps some function like "Player.interact" which will interact with provided tiles?
                 unstableDirection =
                     case ( occupiedTiles, Player.lyingDirection updatedPlayer ) of
                         ( [ Level.Empty, Level.Empty ], _ ) ->

@@ -28,11 +28,12 @@ type BlockAnimationState
     | FallingUnbalanced Direction Float
     | FallingInHorizontalOrientation Direction Float
     | FallingInVerticalOrientation { zOffset : Length, progress : Float }
+    | FallingFromTheSky Float
 
 
 init : ( Int, Int ) -> Player
 init ( x, y ) =
-    Player Standing ( x, y )
+    Player (FallingFromTheSky 0) ( x, y )
 
 
 update : Float -> Player -> Player
@@ -140,6 +141,17 @@ update delta player =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
             Player (FallingInHorizontalOrientation direction newProgress) ( x, y )
+
+        Player (FallingFromTheSky progress) ( x, y ) ->
+            let
+                newProgress =
+                    min (progress + delta * Constant.animationSpeed * 0.3) 1
+            in
+            if newProgress == 1 then
+                Player Standing ( x, y )
+
+            else
+                Player (FallingFromTheSky newProgress) ( x, y )
 
         a ->
             a
@@ -319,6 +331,10 @@ view (Player orientation ( x, y )) =
                 |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
                 |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
                 |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+        FallingFromTheSky progress ->
+            block
+                |> Scene3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
     )
         |> Scene3d.translateBy
             (Vector3d.centimeters positionX positionY 0)
