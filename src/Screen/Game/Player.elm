@@ -477,7 +477,7 @@ fall unbalancedDirection (Player state ( x, y )) =
             Player (FallingUnbalanced Direction.Down 0) ( x - 1, y )
 
         ( Just Direction.Down, Lying Direction.Down ) ->
-            Player (FallingUnbalanced Direction.Down 0) ( x + 1, y )
+            Player (FallingUnbalanced Direction.Down 0) ( x, y )
 
         ( Nothing, Lying direction ) ->
             Player (FallingInHorizontalOrientation direction 0) ( x, y )
