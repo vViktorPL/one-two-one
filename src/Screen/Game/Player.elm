@@ -1,11 +1,11 @@
-module Screen.Game.Player exposing (Player, getPosition, hasSlidedIn, init, move, occupiedTiles, slideIn, update, view)
+module Screen.Game.Player exposing (Player, fall, getPosition, hasFelt, hasSlidedIn, init, lyingDirection, move, occupiedTiles, slideIn, update, view)
 
 import Angle
 import Axis3d
 import Block3d
 import Color
 import Direction3d
-import Length
+import Length exposing (Length)
 import Point3d
 import Scene3d
 import Scene3d.Material as Material
@@ -25,6 +25,9 @@ type BlockAnimationState
     | GettingUp Direction Float
     | Rolling Direction Float
     | SlideIn Float
+    | FallingUnbalanced Direction Float
+    | FallingInHorizontalOrientation Direction Float
+    | FallingInVerticalOrientation { zOffset : Length, progress : Float }
 
 
 init : ( Int, Int ) -> Player
@@ -99,6 +102,44 @@ update delta player =
                     min (progress + delta * Constant.animationSpeed * 0.5) 1
             in
             Player (SlideIn newProgress) ( x, y )
+
+        Player (FallingUnbalanced direction progress) ( x, y ) ->
+            let
+                newProgress =
+                    min (progress + delta * Constant.animationSpeed) 1
+            in
+            if newProgress == 1 then
+                Player (FallingInVerticalOrientation { zOffset = Length.centimeters (0.5 * Constant.playerHeightCm), progress = 0 })
+                    (case direction of
+                        Direction.Left ->
+                            ( x, y - 1 )
+
+                        Direction.Right ->
+                            ( x, y + 1 )
+
+                        Direction.Down ->
+                            ( x + 1, y )
+
+                        Direction.Up ->
+                            ( x - 1, y )
+                    )
+
+            else
+                Player (FallingUnbalanced direction newProgress) ( x, y )
+
+        Player (FallingInVerticalOrientation { zOffset, progress }) ( x, y ) ->
+            let
+                newProgress =
+                    progress + delta * Constant.animationSpeed * min (progress + 1) 5
+            in
+            Player (FallingInVerticalOrientation { zOffset = zOffset, progress = newProgress }) ( x, y )
+
+        Player (FallingInHorizontalOrientation direction progress) ( x, y ) ->
+            let
+                newProgress =
+                    progress + delta * Constant.animationSpeed * min (progress + 1) 5
+            in
+            Player (FallingInHorizontalOrientation direction newProgress) ( x, y )
 
         a ->
             a
@@ -225,6 +266,59 @@ view (Player orientation ( x, y )) =
                     , z2 = Length.centimeters (Constant.playerHeightCm - (progress * progress * 2))
                     }
                 )
+
+        FallingUnbalanced Direction.Left progress ->
+            block
+                |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.y Constant.tileSize
+                |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
+
+        FallingUnbalanced Direction.Right progress ->
+            block
+                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
+
+        FallingUnbalanced Direction.Up progress ->
+            block
+                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                |> Scene3d.rotateAround topAxis (Angle.degrees (90 * progress))
+
+        FallingUnbalanced Direction.Down progress ->
+            block
+                |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+                |> Scene3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
+
+        FallingInVerticalOrientation { zOffset, progress } ->
+            block
+                |> Scene3d.translateIn Direction3d.negativeZ zOffset
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+        FallingInHorizontalOrientation Direction.Left progress ->
+            block
+                |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.y Constant.tileSize
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+        FallingInHorizontalOrientation Direction.Up progress ->
+            block
+                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+        FallingInHorizontalOrientation Direction.Right progress ->
+            block
+                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+        FallingInHorizontalOrientation Direction.Down progress ->
+            block
+                |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
+                |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
     )
         |> Scene3d.translateBy
             (Vector3d.centimeters positionX positionY 0)
@@ -324,6 +418,66 @@ hasSlidedIn player =
     case player of
         Player (SlideIn progress) _ ->
             progress >= 1
+
+        _ ->
+            False
+
+
+lyingDirection : Player -> Maybe Direction
+lyingDirection (Player state _) =
+    case state of
+        Lying direction ->
+            Just direction
+
+        _ ->
+            Nothing
+
+
+fall : Maybe Direction -> Player -> Player
+fall unbalancedDirection (Player state ( x, y )) =
+    case ( unbalancedDirection, state ) of
+        ( _, Standing ) ->
+            Player (FallingInVerticalOrientation { zOffset = Length.centimeters 0, progress = 0 }) ( x, y )
+
+        ( Just Direction.Left, Lying Direction.Left ) ->
+            Player (FallingUnbalanced Direction.Left 0) ( x, y )
+
+        ( Just Direction.Left, Lying Direction.Right ) ->
+            Player (FallingUnbalanced Direction.Left 0) ( x, y + 1 )
+
+        ( Just Direction.Right, Lying Direction.Left ) ->
+            Player (FallingUnbalanced Direction.Right 0) ( x, y + 1 )
+
+        ( Just Direction.Right, Lying Direction.Right ) ->
+            Player (FallingUnbalanced Direction.Right 0) ( x, y )
+
+        ( Just Direction.Up, Lying Direction.Up ) ->
+            Player (FallingUnbalanced Direction.Up 0) ( x, y )
+
+        ( Just Direction.Up, Lying Direction.Down ) ->
+            Player (FallingUnbalanced Direction.Up 0) ( x + 1, y )
+
+        ( Just Direction.Down, Lying Direction.Up ) ->
+            Player (FallingUnbalanced Direction.Down 0) ( x - 1, y )
+
+        ( Just Direction.Down, Lying Direction.Down ) ->
+            Player (FallingUnbalanced Direction.Down 0) ( x + 1, y )
+
+        ( Nothing, Lying direction ) ->
+            Player (FallingInHorizontalOrientation direction 0) ( x, y )
+
+        _ ->
+            Player state ( x, y )
+
+
+hasFelt : Player -> Bool
+hasFelt (Player orientation _) =
+    case orientation of
+        FallingInHorizontalOrientation _ progress ->
+            progress >= 30
+
+        FallingInVerticalOrientation { progress } ->
+            progress >= 30
 
         _ ->
             False

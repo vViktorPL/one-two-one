@@ -79,14 +79,50 @@ update msg (Game game) =
                 fail =
                     List.any ((==) Level.Empty) occupiedTiles
 
+                unstableDirection =
+                    case ( occupiedTiles, Player.lyingDirection updatedPlayer ) of
+                        ( [ Level.Empty, Level.Empty ], _ ) ->
+                            Nothing
+
+                        ( [ Level.Empty, _ ], Just Direction.Left ) ->
+                            Just Direction.Left
+
+                        ( [ Level.Empty, _ ], Just Direction.Right ) ->
+                            Just Direction.Left
+
+                        ( [ Level.Empty, _ ], Just Direction.Up ) ->
+                            Just Direction.Up
+
+                        ( [ Level.Empty, _ ], Just Direction.Down ) ->
+                            Just Direction.Up
+
+                        ( [ _, Level.Empty ], Just Direction.Left ) ->
+                            Just Direction.Right
+
+                        ( [ _, Level.Empty ], Just Direction.Right ) ->
+                            Just Direction.Right
+
+                        ( [ _, Level.Empty ], Just Direction.Up ) ->
+                            Just Direction.Down
+
+                        ( [ _, Level.Empty ], Just Direction.Down ) ->
+                            Just Direction.Down
+
+                        _ ->
+                            Nothing
+
                 success =
                     occupiedTiles == [ Level.Finish ]
 
                 levelFinishAnimationComplete =
                     Player.hasSlidedIn updatedPlayer
             in
-            if fail then
+            if Player.hasFelt updatedPlayer then
                 ( Game { game | player = Player.init (Level.getStartingPosition game.level) }, NoOp )
+
+            else if fail then
+                ( Game { game | player = Player.fall unstableDirection updatedPlayer }, NoOp )
+                --                ( Game { game | player = Player.init (Level.getStartingPosition game.level) }, NoOp )
 
             else if success then
                 ( Game { game | player = Player.slideIn updatedPlayer }, NoOp )
