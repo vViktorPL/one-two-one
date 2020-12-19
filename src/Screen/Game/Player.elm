@@ -1,4 +1,4 @@
-module Screen.Game.Player exposing (Player, fall, getPosition, hasFelt, hasSlidedIn, init, lyingDirection, move, occupiedTiles, slideIn, update, view)
+module Screen.Game.Player exposing (InteractionMsg(..), Player, fall, getPosition, init, interact, move, update, view)
 
 import Angle
 import Axis3d
@@ -11,6 +11,7 @@ import Scene3d
 import Scene3d.Material as Material
 import Screen.Game.Constant as Constant
 import Screen.Game.Direction as Direction exposing (Direction)
+import Screen.Game.Level as Level exposing (Level)
 import Vector3d
 
 
@@ -29,6 +30,11 @@ type BlockAnimationState
     | FallingInHorizontalOrientation Direction Float
     | FallingInVerticalOrientation { zOffset : Length, progress : Float }
     | FallingFromTheSky Float
+
+
+type InteractionMsg
+    = InternalUpdate
+    | FinishedLevel
 
 
 init : ( Int, Int ) -> Player
@@ -424,31 +430,6 @@ getPosition (Player _ position) =
     position
 
 
-slideIn : Player -> Player
-slideIn (Player _ position) =
-    Player (SlideIn 0) position
-
-
-hasSlidedIn : Player -> Bool
-hasSlidedIn player =
-    case player of
-        Player (SlideIn progress) _ ->
-            progress >= 1
-
-        _ ->
-            False
-
-
-lyingDirection : Player -> Maybe Direction
-lyingDirection (Player state _) =
-    case state of
-        Lying direction ->
-            Just direction
-
-        _ ->
-            Nothing
-
-
 fall : Maybe Direction -> Player -> Player
 fall unbalancedDirection (Player state ( x, y )) =
     case ( unbalancedDirection, state ) of
@@ -486,21 +467,8 @@ fall unbalancedDirection (Player state ( x, y )) =
             Player state ( x, y )
 
 
-hasFelt : Player -> Bool
-hasFelt (Player orientation _) =
-    case orientation of
-        FallingInHorizontalOrientation _ progress ->
-            progress >= 30
-
-        FallingInVerticalOrientation { progress } ->
-            progress >= 30
-
-        _ ->
-            False
-
-
-occupiedTiles : Player -> List ( Int, Int )
-occupiedTiles player =
+occupiedPositions : Player -> List ( Int, Int )
+occupiedPositions player =
     case player of
         Player Standing ( x, y ) ->
             [ ( x, y ) ]
@@ -519,3 +487,73 @@ occupiedTiles player =
 
         _ ->
             []
+
+
+interact : Level -> Player -> ( Player, InteractionMsg )
+interact level ((Player state ( x, y )) as player) =
+    let
+        occupiedTiles =
+            player
+                |> occupiedPositions
+                |> List.map (Level.getTileAt level)
+    in
+    case ( occupiedTiles, state ) of
+        -- Falling off the stage
+        ( [ Level.Empty ], _ ) ->
+            ( fall Nothing player, InternalUpdate )
+
+        ( [ Level.Empty, _ ], Lying Direction.Left ) ->
+            ( fall (Just Direction.Left) player, InternalUpdate )
+
+        ( [ Level.Empty, _ ], Lying Direction.Right ) ->
+            ( fall (Just Direction.Left) player, InternalUpdate )
+
+        ( [ Level.Empty, _ ], Lying Direction.Up ) ->
+            ( fall (Just Direction.Up) player, InternalUpdate )
+
+        ( [ Level.Empty, _ ], Lying Direction.Down ) ->
+            ( fall (Just Direction.Up) player, InternalUpdate )
+
+        ( [ _, Level.Empty ], Lying Direction.Left ) ->
+            ( fall (Just Direction.Right) player, InternalUpdate )
+
+        ( [ _, Level.Empty ], Lying Direction.Right ) ->
+            ( fall (Just Direction.Right) player, InternalUpdate )
+
+        ( [ _, Level.Empty ], Lying Direction.Up ) ->
+            ( fall (Just Direction.Down) player, InternalUpdate )
+
+        ( [ _, Level.Empty ], Lying Direction.Down ) ->
+            ( fall (Just Direction.Down) player, InternalUpdate )
+
+        -- Success
+        ( [ Level.Finish ], _ ) ->
+            ( Player (SlideIn 0) ( x, y ), InternalUpdate )
+
+        ( [], SlideIn progress ) ->
+            ( player
+            , if progress >= 1 then
+                FinishedLevel
+
+              else
+                InternalUpdate
+            )
+
+        -- Restart
+        ( [], FallingInHorizontalOrientation _ progress ) ->
+            if progress >= 30 then
+                ( init (Level.getStartingPosition level), InternalUpdate )
+
+            else
+                ( player, InternalUpdate )
+
+        ( [], FallingInVerticalOrientation { progress } ) ->
+            if progress >= 30 then
+                ( init (Level.getStartingPosition level), InternalUpdate )
+
+            else
+                ( player, InternalUpdate )
+
+        -- Nothing to be done
+        _ ->
+            ( player, InternalUpdate )

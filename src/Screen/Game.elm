@@ -66,85 +66,30 @@ update msg (Game game) =
     case msg of
         Tick delta ->
             let
-                updatedPlayer =
+                ( updatedPlayer, interactionMsg ) =
                     game.player
                         |> controlPlayer game.control
                         |> Player.update delta
-
-                occupiedTiles =
-                    updatedPlayer
-                        |> Player.occupiedTiles
-                        |> List.map (Level.getTileAt game.level)
-
-                fail =
-                    List.any ((==) Level.Empty) occupiedTiles
-
-                -- TODO refactor this to player module, perhaps some function like "Player.interact" which will interact with provided tiles?
-                unstableDirection =
-                    case ( occupiedTiles, Player.lyingDirection updatedPlayer ) of
-                        ( [ Level.Empty, Level.Empty ], _ ) ->
-                            Nothing
-
-                        ( [ Level.Empty, _ ], Just Direction.Left ) ->
-                            Just Direction.Left
-
-                        ( [ Level.Empty, _ ], Just Direction.Right ) ->
-                            Just Direction.Left
-
-                        ( [ Level.Empty, _ ], Just Direction.Up ) ->
-                            Just Direction.Up
-
-                        ( [ Level.Empty, _ ], Just Direction.Down ) ->
-                            Just Direction.Up
-
-                        ( [ _, Level.Empty ], Just Direction.Left ) ->
-                            Just Direction.Right
-
-                        ( [ _, Level.Empty ], Just Direction.Right ) ->
-                            Just Direction.Right
-
-                        ( [ _, Level.Empty ], Just Direction.Up ) ->
-                            Just Direction.Down
-
-                        ( [ _, Level.Empty ], Just Direction.Down ) ->
-                            Just Direction.Down
-
-                        _ ->
-                            Nothing
-
-                success =
-                    occupiedTiles == [ Level.Finish ]
-
-                levelFinishAnimationComplete =
-                    Player.hasSlidedIn updatedPlayer
+                        |> Player.interact game.level
             in
-            if Player.hasFelt updatedPlayer then
-                ( Game { game | player = Player.init (Level.getStartingPosition game.level) }, NoOp )
+            case interactionMsg of
+                Player.InternalUpdate ->
+                    ( Game { game | player = updatedPlayer }, NoOp )
 
-            else if fail then
-                ( Game { game | player = Player.fall unstableDirection updatedPlayer }, NoOp )
-                --                ( Game { game | player = Player.init (Level.getStartingPosition game.level) }, NoOp )
+                Player.FinishedLevel ->
+                    case game.levelsLeft of
+                        nextLevel :: rest ->
+                            ( Game
+                                { player = Player.init (Level.getStartingPosition nextLevel)
+                                , level = nextLevel
+                                , levelsLeft = rest
+                                , control = Nothing
+                                }
+                            , NoOp
+                            )
 
-            else if success then
-                ( Game { game | player = Player.slideIn updatedPlayer }, NoOp )
-
-            else if levelFinishAnimationComplete then
-                case game.levelsLeft of
-                    nextLevel :: rest ->
-                        ( Game
-                            { player = Player.init (Level.getStartingPosition nextLevel)
-                            , level = nextLevel
-                            , levelsLeft = rest
-                            , control = Nothing
-                            }
-                        , NoOp
-                        )
-
-                    [] ->
-                        ( Game game, GameFinished )
-
-            else
-                ( Game { game | player = updatedPlayer }, NoOp )
+                        [] ->
+                            ( Game game, GameFinished )
 
         KeyDown key ->
             ( key
