@@ -220,5 +220,29 @@ keyToDirection string =
         "ArrowDown" ->
             Just Direction.Down
 
+        "w" ->
+            Just Direction.Up
+
+        "W" ->
+            Just Direction.Up
+
+        "a" ->
+            Just Direction.Left
+
+        "A" ->
+            Just Direction.Left
+
+        "d" ->
+            Just Direction.Right
+
+        "D" ->
+            Just Direction.Right
+
+        "s" ->
+            Just Direction.Down
+
+        "S" ->
+            Just Direction.Down
+
         _ ->
             Nothing
