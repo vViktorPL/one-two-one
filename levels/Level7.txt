@@ -1,0 +1,15 @@
+#### 1
+#S## #
+###### ###
+######-#F#
+ ^     ###
+ |
+ ###
+  #2
+
+---
+1 Trigger [ToggleBridge @^, ToggleBridge @|]
+2 Trigger [ToggleBridge @-]
+^ Bridge Up False
+| Bridge Down False
+- Bridge Left False

@@ -3,4 +3,4 @@ import Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), from
 import Screen.Game.Direction exposing (..)
 
 data : Level
-data = fromData [[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor],[Empty,Floor,Floor,Floor,Empty,Empty,Empty,Floor,Floor],[Empty,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor,Floor],[Empty,Floor,Floor,Floor,Empty,Empty,Empty,Empty,Empty,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Finish,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Empty,Empty,Floor,Floor,Floor],[]] (1, 2)
+data = fromData [[Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor,Floor],[Floor,Floor,Trigger [ToggleBridge (3, 4), ToggleBridge (3, 5)],Floor,Empty,Empty,Floor,Finish,Floor],[Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor,Floor],[Floor,Floor,Floor,Floor,Bridge Left False,Bridge Right False,Floor,Floor,Floor],[]] (3, 1)

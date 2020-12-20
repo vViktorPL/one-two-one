@@ -3,4 +3,4 @@ import Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), from
 import Screen.Game.Direction exposing (..)
 
 data : Level
-data = fromData [[Floor,Floor,Floor,Floor,Floor,Floor],[Empty,Empty,Empty,Empty,Floor,Floor],[Empty,Floor,Floor,RustyFloor,RustyFloor,RustyFloor,RustyFloor,RustyFloor],[Floor,Floor,Floor,RustyFloor,RustyFloor,RustyFloor,RustyFloor,RustyFloor],[Floor,Finish,Floor,Empty,RustyFloor,RustyFloor,Floor,RustyFloor],[Floor,Floor,Floor,Empty,RustyFloor,RustyFloor,RustyFloor,RustyFloor],[]] (0, 0)
+data = fromData [[Empty,Empty,Floor,RustyFloor,RustyFloor,RustyFloor,RustyFloor,Floor],[Empty,Empty,Floor,RustyFloor,RustyFloor,RustyFloor,RustyFloor,Floor],[Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor],[Floor,Floor,Floor,Floor,Empty,Empty,Floor,Floor],[Floor,Floor,Floor,Floor,Empty,Floor,Floor,Floor],[Empty,Empty,Empty,Empty,Empty,Floor,Finish,Floor],[Empty,Empty,Empty,Empty,Empty,Floor,Floor,Floor],[]] (4, 1)

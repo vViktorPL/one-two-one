@@ -1,7 +1,9 @@
-       ##
- #S#   ##
- ##########
- ###     ##
-       ####
-       #F##
-       ###
+####  ###
+##o#  #F#
+####  ###
+#S##[]###
+
+---
+[ Bridge Left False
+] Bridge Right False
+o Trigger [ToggleBridge @[, ToggleBridge @]]
