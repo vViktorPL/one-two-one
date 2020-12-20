@@ -13,10 +13,29 @@ fs.readdir(path.join(__dirname, '../levels')).then(
       fs.readFile(path.join(levelsPath, filename)).then(
         content => {
           const outputFilePath = path.join(outputPath, filename.replace('.txt', '.elm'));
-          const rows = String(content).split('\n');
+          const lines = String(content).split('\n');
+          const legendSeparator = lines.indexOf('---');
+          const rows = legendSeparator !== -1 ? lines.slice(0, legendSeparator) : lines;
+
+          const uniqueTilePositions = Object.fromEntries(rows.flatMap(
+            (row, x) => [...row].map((char, y) => [char, `(${x}, ${y})`])
+          ));
+
+          const legend = legendSeparator !== -1 ? lines.slice(legendSeparator + 1).reduce(
+            (acc, line) => {
+              if (line.trim() === "") {
+                return acc;
+              }
+
+              acc[line.substring(0, 1)] = line.substring(2).replace(/@(.)/g, match => uniqueTilePositions[match[1]]);
+
+              return acc;
+            },
+            {}
+          ) : {};
 
           const tileRows = rows.map(
-            row => `[${[...row].map(asciiToTile).join(',')}]`
+            row => `[${[...row].map(asciiToTile(legend)).join(',')}]`
           );
           const tiles = `[${tileRows.join(',')}]`;
 
@@ -26,7 +45,8 @@ fs.readdir(path.join(__dirname, '../levels')).then(
 
           const code = [
             `module Screen.Game.Level.${filename.replace(".txt", "")} exposing (data)`,
-            'import Screen.Game.Level exposing (Level, LevelTile(..), fromData)',
+            'import Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), fromData)',
+            'import Screen.Game.Direction exposing (..)',
             '',
             'data : Level',
             `data = fromData ${tiles} (${startingPosX}, ${startingPosY})`,
@@ -56,7 +76,7 @@ fs.readdir(path.join(__dirname, '../levels')).then(
 );
 
 
-const asciiToTile = ascii => {
+const asciiToTile = legend => ascii => {
   switch (ascii) {
     case '#':
     case 'S':
@@ -69,6 +89,10 @@ const asciiToTile = ascii => {
       return "RustyFloor";
 
     default:
+      if (ascii in legend) {
+        return legend[ascii];
+      }
+
       return "Empty";
   }
 };

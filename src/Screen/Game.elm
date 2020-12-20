@@ -71,10 +71,14 @@ update msg (Game game) =
                         |> controlPlayer game.control
                         |> Player.update delta
                         |> Player.interact game.level
+
+                updatedLevel =
+                    game.level
+                        |> Level.update delta
             in
             case interactionMsg of
                 Player.InternalUpdate ->
-                    ( Game { game | player = updatedPlayer }, NoOp )
+                    ( Game { game | player = updatedPlayer, level = updatedLevel }, NoOp )
 
                 Player.FinishedLevel ->
                     case game.levelsLeft of
@@ -96,6 +100,28 @@ update msg (Game game) =
                         { game
                             | player = updatedPlayer
                             , level = Level.shiftTile (Player.getPosition updatedPlayer) zOffset game.level
+                        }
+                    , NoOp
+                    )
+
+                Player.TriggerActions actions ->
+                    let
+                        previousInteractionMsg =
+                            game.player
+                                |> Player.interact game.level
+                                |> Tuple.second
+                    in
+                    ( Game
+                        { game
+                            | player = updatedPlayer
+                            , level =
+                                case previousInteractionMsg of
+                                    Player.TriggerActions _ ->
+                                        updatedLevel
+
+                                    _ ->
+                                        -- Trigger only if not trigged in last update already
+                                        Level.triggerActions actions updatedLevel
                         }
                     , NoOp
                     )

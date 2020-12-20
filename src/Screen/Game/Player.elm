@@ -38,6 +38,7 @@ type InteractionMsg
     | FinishedLevel
     | PushDownTile Length
     | RestartedLevel
+    | TriggerActions (List Level.TriggerAction)
 
 
 init : ( Int, Int ) -> Player
@@ -581,6 +582,16 @@ interact level ((Player state ( x, y )) as player) =
 
             else
                 ( player, InternalUpdate )
+
+        -- Trigger activation
+        ( [ Level.Trigger actions, _ ], Lying _ ) ->
+            ( player, TriggerActions actions )
+
+        ( [ _, Level.Trigger actions ], Lying _ ) ->
+            ( player, TriggerActions actions )
+
+        ( [ Level.Trigger actions ], Standing ) ->
+            ( player, TriggerActions actions )
 
         -- Nothing to be done
         _ ->
