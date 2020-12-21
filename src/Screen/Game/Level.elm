@@ -191,7 +191,18 @@ view (Level { tiles, tileStates }) =
 
                             Bridge openingDirection initiallyClosed ->
                                 floorEntity Color.darkYellow ( x, y )
-                                    |> (case Maybe.withDefault (BridgeState initiallyClosed 0) (Dict.get ( x, y ) tileStates) of
+                                    |> (case
+                                            Maybe.withDefault
+                                                (BridgeState initiallyClosed
+                                                    (if initiallyClosed then
+                                                        1
+
+                                                     else
+                                                        0
+                                                    )
+                                                )
+                                                (Dict.get ( x, y ) tileStates)
+                                        of
                                             BridgeState _ progress ->
                                                 let
                                                     axis =

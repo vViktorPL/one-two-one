@@ -1,0 +1,15 @@
+### ###2
+### [*]
+S###RRR
+ #    R$
+ R    ###
+ R    #F#
+ 1    ###
+
+---
+1 Trigger [ToggleBridge @[, ToggleBridge @*, ToggleBridge @]]
+2 Trigger [ToggleBridge @$]
+[ Bridge Up False
+* Bridge Up False
+] Bridge Up False
+$ Bridge Down False
