@@ -1,4 +1,4 @@
-module Screen.Game.Level.Level7 exposing (data)
+module Screen.Game.Level.Level08 exposing (data)
 import Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), fromData)
 import Screen.Game.Direction exposing (..)
 

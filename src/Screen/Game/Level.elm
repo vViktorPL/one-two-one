@@ -27,6 +27,8 @@ type LevelTile
 
 type TriggerAction
     = ToggleBridge ( Int, Int )
+    | CloseBridge ( Int, Int )
+    | OpenBridge ( Int, Int )
 
 
 type TileState
@@ -104,17 +106,23 @@ triggerActions actions level =
         (\action levelAcc ->
             case action of
                 ToggleBridge ( x, y ) ->
-                    toggleBridge ( x, y ) levelAcc
+                    toggleBridge not ( x, y ) levelAcc
+
+                CloseBridge ( x, y ) ->
+                    toggleBridge (always True) ( x, y ) levelAcc
+
+                OpenBridge ( x, y ) ->
+                    toggleBridge (always False) ( x, y ) levelAcc
         )
         level
         actions
 
 
-toggleBridge : ( Int, Int ) -> Level -> Level
-toggleBridge ( x, y ) (Level level) =
+toggleBridge : (Bool -> Bool) -> ( Int, Int ) -> Level -> Level
+toggleBridge mapPreviousState ( x, y ) (Level level) =
     case Dict.get ( x, y ) level.tileStates of
         Just (BridgeState closed progress) ->
-            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState (not closed) progress) level.tileStates }
+            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState (mapPreviousState closed) progress) level.tileStates }
 
         _ ->
             let
@@ -126,14 +134,17 @@ toggleBridge ( x, y ) (Level level) =
                         _ ->
                             False
 
+                newClosed =
+                    mapPreviousState initiallyClosed
+
                 progress =
-                    if initiallyClosed then
-                        1
+                    if newClosed then
+                        0
 
                     else
-                        0
+                        1
             in
-            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState (not initiallyClosed) progress) level.tileStates }
+            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState newClosed progress) level.tileStates }
 
 
 restart : Level -> Level

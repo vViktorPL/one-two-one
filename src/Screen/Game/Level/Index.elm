@@ -1,20 +1,21 @@
 module Screen.Game.Level.Index exposing (firstLevel, restLevels)
 
 import Screen.Game.Level exposing (Level)
-import Screen.Game.Level.Level0
-import Screen.Game.Level.Level1
-import Screen.Game.Level.Level2
-import Screen.Game.Level.Level3
-import Screen.Game.Level.Level4
-import Screen.Game.Level.Level5
-import Screen.Game.Level.Level6
-import Screen.Game.Level.Level7
-import Screen.Game.Level.Level8
-import Screen.Game.Level.Level9
+import Screen.Game.Level.Level01
+import Screen.Game.Level.Level02
+import Screen.Game.Level.Level03
+import Screen.Game.Level.Level04
+import Screen.Game.Level.Level05
+import Screen.Game.Level.Level06
+import Screen.Game.Level.Level07
+import Screen.Game.Level.Level08
+import Screen.Game.Level.Level09
+import Screen.Game.Level.Level10
+import Screen.Game.Level.Level11
 
 
 firstLevel : Level
-firstLevel = Screen.Game.Level.Level0.data
+firstLevel = Screen.Game.Level.Level01.data
 
 restLevels : List Level
-restLevels = [Screen.Game.Level.Level1.data, Screen.Game.Level.Level2.data, Screen.Game.Level.Level3.data, Screen.Game.Level.Level4.data, Screen.Game.Level.Level5.data, Screen.Game.Level.Level6.data, Screen.Game.Level.Level7.data, Screen.Game.Level.Level8.data, Screen.Game.Level.Level9.data]
+restLevels = [Screen.Game.Level.Level02.data, Screen.Game.Level.Level03.data, Screen.Game.Level.Level04.data, Screen.Game.Level.Level05.data, Screen.Game.Level.Level06.data, Screen.Game.Level.Level07.data, Screen.Game.Level.Level08.data, Screen.Game.Level.Level09.data, Screen.Game.Level.Level10.data, Screen.Game.Level.Level11.data]

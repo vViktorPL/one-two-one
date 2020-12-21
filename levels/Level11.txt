@@ -1,0 +1,19 @@
+#########
+###1#2#3#
+#S####RRR
+   A
+   #
+   B
+   #
+   C
+ ####
+ #F##
+ ####
+
+---
+A Bridge Up False
+B Bridge Up False
+C Bridge Up True
+1 Trigger [ToggleBridge @A]
+2 Trigger [OpenBridge @C]
+3 Trigger [ToggleBridge @B]
