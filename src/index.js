@@ -2,7 +2,14 @@ import { Elm } from "./Main.elm"
 
 var app = Elm.Main.init({
   node: document.getElementById('app'),
-  flags: { mobile: 'ontouchstart' in document.documentElement },
+  flags: {
+    mobile: 'ontouchstart' in document.documentElement,
+    lastLevel: parseInt(localStorage.getItem("lastLevel") || "0")
+  },
+});
+
+app.ports.saveGame.subscribe(function (lastLevel) {
+  localStorage.setItem("lastLevel", String(lastLevel));
 });
 
 // Prevent scrolling with arrow and space keys

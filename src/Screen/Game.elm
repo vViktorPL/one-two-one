@@ -41,15 +41,29 @@ type Msg
 
 type MsgOut
     = NoOp
+    | SaveGame Int
     | GameFinished
 
 
-init : Bool -> Game
-init mobile =
+init : Bool -> Int -> Game
+init mobile levelStartIndex =
+    let
+        levels =
+            (LevelIndex.firstLevel :: LevelIndex.restLevels)
+                |> List.drop levelStartIndex
+
+        ( level, levelsLeft ) =
+            case levels of
+                first :: rest ->
+                    ( first, rest )
+
+                _ ->
+                    ( LevelIndex.firstLevel, LevelIndex.restLevels )
+    in
     Game
         { player = Player.init (Level.getStartingPosition LevelIndex.firstLevel)
-        , level = LevelIndex.firstLevel
-        , levelsLeft = LevelIndex.restLevels
+        , level = level
+        , levelsLeft = levelsLeft
         , control = Nothing
         , mobile = mobile
         }
@@ -94,7 +108,7 @@ update msg (Game game) =
                                 , control = Nothing
                                 , mobile = game.mobile
                                 }
-                            , NoOp
+                            , SaveGame (List.length LevelIndex.restLevels - List.length rest)
                             )
 
                         [] ->
