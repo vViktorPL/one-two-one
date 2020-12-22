@@ -1,13 +1,17 @@
 module Main exposing (Model, Msg(..), Screen(..), init, main, subscriptions, update, view)
 
 import Browser
+import Browser.Dom
+import Browser.Events
 import Html exposing (Html)
 import Screen.Congratulations exposing (Congratulations)
 import Screen.Game exposing (Game)
+import Task
 
 
 type alias Model =
     { screen : Screen
+    , screenDimensions : ( Int, Int )
     }
 
 
@@ -18,38 +22,46 @@ type Screen
 
 type Msg
     = GameMsg Screen.Game.Msg
+    | ViewportSize ( Int, Int )
 
 
-init : () -> ( Model, Cmd Msg )
-init flags =
-    ( { screen = GameScreen Screen.Game.init }
-    , Cmd.none
+init : { mobile : Bool } -> ( Model, Cmd Msg )
+init { mobile } =
+    ( { screen = GameScreen (Screen.Game.init mobile), screenDimensions = ( 0, 0 ) }
+    , Browser.Dom.getViewport
+        |> Task.perform (\{ viewport } -> ViewportSize ( floor viewport.width, floor viewport.height ))
     )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg { screen } =
-    case ( screen, msg ) of
+update msg model =
+    case ( model.screen, msg ) of
+        ( _, ViewportSize dimensions ) ->
+            ( { model | screenDimensions = dimensions }, Cmd.none )
+
         ( GameScreen game, GameMsg gameMsg ) ->
             case Screen.Game.update gameMsg game of
                 ( updatedGame, Screen.Game.NoOp ) ->
-                    ( { screen = GameScreen updatedGame }, Cmd.none )
+                    ( { model | screen = GameScreen updatedGame }, Cmd.none )
 
                 ( _, Screen.Game.GameFinished ) ->
-                    ( { screen = CongratulationsScreen Screen.Congratulations.init }, Cmd.none )
+                    ( { model | screen = CongratulationsScreen Screen.Congratulations.init }, Cmd.none )
 
         _ ->
-            ( { screen = screen }, Cmd.none )
+            ( model, Cmd.none )
 
 
 subscriptions : Model -> Sub Msg
 subscriptions { screen } =
-    case screen of
-        GameScreen game ->
-            Sub.map GameMsg (Screen.Game.subscriptions game)
+    Sub.batch
+        [ case screen of
+            GameScreen game ->
+                Sub.map GameMsg (Screen.Game.subscriptions game)
 
-        CongratulationsScreen _ ->
-            Sub.none
+            CongratulationsScreen _ ->
+                Sub.none
+        , Browser.Events.onResize (\width height -> ViewportSize ( width, height ))
+        ]
 
 
 main =
@@ -62,10 +74,10 @@ main =
 
 
 view : Model -> Html Msg
-view { screen } =
+view { screen, screenDimensions } =
     case screen of
         GameScreen game ->
-            Html.map GameMsg (Screen.Game.view game)
+            Html.map GameMsg (Screen.Game.view screenDimensions game)
 
         CongratulationsScreen congratulations ->
             Screen.Congratulations.view congratulations

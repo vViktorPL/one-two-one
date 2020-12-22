@@ -8,6 +8,8 @@ import Camera3d
 import Direction3d
 import Duration exposing (Duration)
 import Html exposing (Html)
+import Html.Attributes exposing (style)
+import Html.Events as Event
 import Json.Decode as Decode
 import Length
 import Pixels
@@ -27,6 +29,7 @@ type Game
         , level : Level
         , levelsLeft : List Level
         , control : Maybe Direction
+        , mobile : Bool
         }
 
 
@@ -41,13 +44,14 @@ type MsgOut
     | GameFinished
 
 
-init : Game
-init =
+init : Bool -> Game
+init mobile =
     Game
         { player = Player.init (Level.getStartingPosition LevelIndex.firstLevel)
         , level = LevelIndex.firstLevel
         , levelsLeft = LevelIndex.restLevels
         , control = Nothing
+        , mobile = mobile
         }
 
 
@@ -88,6 +92,7 @@ update msg (Game game) =
                                 , level = nextLevel
                                 , levelsLeft = rest
                                 , control = Nothing
+                                , mobile = game.mobile
                                 }
                             , NoOp
                             )
@@ -154,30 +159,96 @@ update msg (Game game) =
             )
 
 
-view : Game -> Html Msg
-view (Game { player, level }) =
+view : ( Int, Int ) -> Game -> Html Msg
+view ( width, height ) (Game { player, level, mobile }) =
     let
+        zoomOut =
+            max (800 / toFloat width) 1
+
         camera =
             Camera3d.perspective
                 { viewpoint =
-                    Viewpoint3d.lookAt
+                    Viewpoint3d.orbitZ
                         { focalPoint = Point3d.centimeters 5 5 0
-                        , eyePoint = Point3d.centimeters 20 10 15
-                        , upDirection = Direction3d.z
+                        , azimuth = Angle.degrees 25
+                        , elevation = Angle.degrees 45
+                        , distance = Length.centimeters (25 * zoomOut)
                         }
                 , verticalFieldOfView = Angle.degrees 30
                 }
     in
-    Scene3d.sunny
-        { entities = [ Player.view player, Level.view level ]
-        , camera = camera
-        , upDirection = Direction3d.z
-        , sunlightDirection = Direction3d.yz (Angle.degrees -120)
-        , background = Scene3d.transparentBackground
-        , clipDepth = Length.centimeters 1
-        , shadows = False
-        , dimensions = ( Pixels.int 800, Pixels.int 600 )
-        }
+    Html.div []
+        [ Scene3d.sunny
+            { entities = [ Player.view player, Level.view level ]
+            , camera = camera
+            , upDirection = Direction3d.z
+            , sunlightDirection = Direction3d.yz (Angle.degrees -120)
+            , background = Scene3d.transparentBackground
+            , clipDepth = Length.centimeters 1
+            , shadows = False
+            , dimensions = ( Pixels.int width, Pixels.int height )
+            }
+        , if mobile then
+            mobileControls
+
+          else
+            Html.text ""
+        ]
+
+
+onTouchStart msg =
+    Event.on "touchstart" (Decode.succeed msg)
+
+
+onTouchEnd msg =
+    Event.on "touchend" (Decode.succeed msg)
+
+
+mobileControls : Html Msg
+mobileControls =
+    Html.div
+        [ style "position" "absolute"
+        , style "right" "0"
+        , style "bottom" "0"
+        , style "width" "30vw"
+        , style "height" "30vw"
+        , style "font-size" "10vw"
+        , style "user-select" "none"
+        , style "-webkit-user-select" "none"
+        ]
+        [ Html.div
+            [ onTouchStart (KeyDown "ArrowUp")
+            , onTouchEnd (KeyUp "ArrowUp")
+            , style "position" "absolute"
+            , style "top" "0"
+            , style "left" "10vw"
+            ]
+            [ Html.text "⬆️️" ]
+        , Html.div
+            [ onTouchStart (KeyDown "ArrowLeft")
+            , onTouchEnd (KeyUp "ArrowLeft")
+            , style "position" "absolute"
+            , style "top" "9vw"
+            , style "left" "0"
+            ]
+            [ Html.text "⬅️" ]
+        , Html.div
+            [ onTouchStart (KeyDown "ArrowRight")
+            , onTouchEnd (KeyUp "ArrowRight")
+            , style "position" "absolute"
+            , style "top" "9vw"
+            , style "right" "0"
+            ]
+            [ Html.text "➡️️" ]
+        , Html.div
+            [ onTouchStart (KeyDown "ArrowDown")
+            , onTouchEnd (KeyUp "ArrowDown")
+            , style "position" "absolute"
+            , style "bottom" "0"
+            , style "left" "10vw"
+            ]
+            [ Html.text "⬇️️️" ]
+        ]
 
 
 subscriptions : Game -> Sub Msg
