@@ -12,6 +12,7 @@ import Scene3d.Material as Material
 import Screen.Game.Constant as Constant
 import Screen.Game.Direction as Direction exposing (Direction)
 import Screen.Game.Level as Level exposing (Level)
+import Sound
 import Vector3d
 
 
@@ -39,6 +40,7 @@ type InteractionMsg
     | PushDownTile Length
     | RestartedLevel
     | TriggerActions (List Level.TriggerAction)
+    | EmitSound String
 
 
 init : ( Int, Int ) -> Player
@@ -46,73 +48,100 @@ init ( x, y ) =
     Player (FallingFromTheSky 0) ( x, y )
 
 
-update : Float -> Player -> Player
-update delta player =
+update : Float -> Level -> Player -> ( Player, Cmd msg )
+update delta level player =
     case player of
         Player (KnockingOver direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
+
+                newPlayer =
+                    if newProgress >= 1 then
+                        Player
+                            (Lying direction)
+                            (case direction of
+                                Direction.Up ->
+                                    ( x - 1, y )
+
+                                Direction.Right ->
+                                    ( x, y + 1 )
+
+                                Direction.Left ->
+                                    ( x, y - 1 )
+
+                                Direction.Down ->
+                                    ( x + 1, y )
+                            )
+
+                    else
+                        Player (KnockingOver direction newProgress) ( x, y )
             in
-            if newProgress >= 1 then
-                Player
-                    (Lying direction)
-                    (case direction of
-                        Direction.Up ->
-                            ( x - 1, y )
+            ( newPlayer
+            , if newProgress < 1 || unstablePosition newPlayer level then
+                Cmd.none
 
-                        Direction.Right ->
-                            ( x, y + 1 )
-
-                        Direction.Left ->
-                            ( x, y - 1 )
-
-                        Direction.Down ->
-                            ( x + 1, y )
-                    )
-
-            else
-                Player (KnockingOver direction newProgress) ( x, y )
+              else
+                Sound.playSound "lay"
+            )
 
         Player (GettingUp direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
-            in
-            if newProgress >= 1 then
-                Player Standing ( x, y )
 
-            else
-                Player (GettingUp direction newProgress) ( x, y )
+                newPlayer =
+                    if newProgress >= 1 then
+                        Player Standing ( x, y )
+
+                    else
+                        Player (GettingUp direction newProgress) ( x, y )
+            in
+            ( newPlayer
+            , if newProgress < 1 || unstablePosition newPlayer level then
+                Cmd.none
+
+              else
+                Sound.playSound "stand"
+            )
 
         Player (Rolling direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
+
+                newPlayer =
+                    if newProgress >= 1 then
+                        case direction of
+                            Direction.Left ->
+                                Player (Lying Direction.Up) ( x, y - 1 )
+
+                            Direction.Right ->
+                                Player (Lying Direction.Up) ( x, y + 1 )
+
+                            Direction.Up ->
+                                Player (Lying Direction.Right) ( x - 1, y )
+
+                            Direction.Down ->
+                                Player (Lying Direction.Right) ( x + 1, y )
+
+                    else
+                        Player (Rolling direction newProgress) ( x, y )
             in
-            if newProgress >= 1 then
-                case direction of
-                    Direction.Left ->
-                        Player (Lying Direction.Up) ( x, y - 1 )
+            ( newPlayer
+            , if newProgress < 1 || unstablePosition newPlayer level then
+                Cmd.none
 
-                    Direction.Right ->
-                        Player (Lying Direction.Up) ( x, y + 1 )
-
-                    Direction.Up ->
-                        Player (Lying Direction.Right) ( x - 1, y )
-
-                    Direction.Down ->
-                        Player (Lying Direction.Right) ( x + 1, y )
-
-            else
-                Player (Rolling direction newProgress) ( x, y )
+              else
+                Sound.playSound "lay"
+            )
 
         Player (SlideIn progress) ( x, y ) ->
             let
                 newProgress =
                     min (progress + delta * Constant.animationSpeed * 0.5) 1
             in
-            Player (SlideIn newProgress) ( x, y )
+            ( Player (SlideIn newProgress) ( x, y ), Cmd.none )
 
         Player (FallingUnbalanced direction progress) ( x, y ) ->
             let
@@ -120,7 +149,7 @@ update delta player =
                     min (progress + delta * Constant.animationSpeed) 1
             in
             if newProgress == 1 then
-                Player (FallingInVerticalOrientation { zOffset = Length.centimeters (0.5 * Constant.playerHeightCm), progress = 0 })
+                ( Player (FallingInVerticalOrientation { zOffset = Length.centimeters (0.5 * Constant.playerHeightCm), progress = 0 })
                     (case direction of
                         Direction.Left ->
                             ( x, y - 1 )
@@ -134,23 +163,25 @@ update delta player =
                         Direction.Up ->
                             ( x - 1, y )
                     )
+                , Cmd.none
+                )
 
             else
-                Player (FallingUnbalanced direction newProgress) ( x, y )
+                ( Player (FallingUnbalanced direction newProgress) ( x, y ), Cmd.none )
 
         Player (FallingInVerticalOrientation { zOffset, progress }) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            Player (FallingInVerticalOrientation { zOffset = zOffset, progress = newProgress }) ( x, y )
+            ( Player (FallingInVerticalOrientation { zOffset = zOffset, progress = newProgress }) ( x, y ), Cmd.none )
 
         Player (FallingInHorizontalOrientation direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            Player (FallingInHorizontalOrientation direction newProgress) ( x, y )
+            ( Player (FallingInHorizontalOrientation direction newProgress) ( x, y ), Cmd.none )
 
         Player (FallingFromTheSky progress) ( x, y ) ->
             let
@@ -158,20 +189,22 @@ update delta player =
                     min (progress + delta * Constant.animationSpeed * 0.3) 1
             in
             if newProgress == 1 then
-                Player Standing ( x, y )
+                ( Player Standing ( x, y )
+                , Sound.playSound "stand"
+                )
 
             else
-                Player (FallingFromTheSky newProgress) ( x, y )
+                ( Player (FallingFromTheSky newProgress) ( x, y ), Cmd.none )
 
         Player (FallingWithTheFloor progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            Player (FallingWithTheFloor newProgress) ( x, y )
+            ( Player (FallingWithTheFloor newProgress) ( x, y ), Cmd.none )
 
-        a ->
-            a
+        plr ->
+            ( plr, Cmd.none )
 
 
 view : Player -> Scene3d.Entity coordinates
@@ -504,49 +537,56 @@ occupiedPositions player =
             []
 
 
+occupiedTiles : Player -> Level -> List Level.LevelTile
+occupiedTiles player level =
+    player
+        |> occupiedPositions
+        |> List.map (Level.getTileAt level)
+
+
+unstablePosition : Player -> Level -> Bool
+unstablePosition player level =
+    occupiedTiles player level
+        |> List.any ((==) Level.Empty)
+
+
 interact : Level -> Player -> ( Player, InteractionMsg )
 interact level ((Player state ( x, y )) as player) =
-    let
-        occupiedTiles =
-            player
-                |> occupiedPositions
-                |> List.map (Level.getTileAt level)
-    in
-    case ( occupiedTiles, state ) of
+    case ( occupiedTiles player level, state ) of
         -- Falling off the stage
         ( [ Level.Empty ], _ ) ->
-            ( fall Nothing player, InternalUpdate )
+            ( fall Nothing player, EmitSound "fall" )
 
         ( [ Level.Empty, Level.Empty ], _ ) ->
-            ( fall Nothing player, InternalUpdate )
+            ( fall Nothing player, EmitSound "fall" )
 
         ( [ Level.Empty, _ ], Lying Direction.Left ) ->
-            ( fall (Just Direction.Left) player, InternalUpdate )
+            ( fall (Just Direction.Left) player, EmitSound "fall" )
 
         ( [ Level.Empty, _ ], Lying Direction.Right ) ->
-            ( fall (Just Direction.Left) player, InternalUpdate )
+            ( fall (Just Direction.Left) player, EmitSound "fall" )
 
         ( [ Level.Empty, _ ], Lying Direction.Up ) ->
-            ( fall (Just Direction.Up) player, InternalUpdate )
+            ( fall (Just Direction.Up) player, EmitSound "fall" )
 
         ( [ Level.Empty, _ ], Lying Direction.Down ) ->
-            ( fall (Just Direction.Up) player, InternalUpdate )
+            ( fall (Just Direction.Up) player, EmitSound "fall" )
 
         ( [ _, Level.Empty ], Lying Direction.Left ) ->
-            ( fall (Just Direction.Right) player, InternalUpdate )
+            ( fall (Just Direction.Right) player, EmitSound "fall" )
 
         ( [ _, Level.Empty ], Lying Direction.Right ) ->
-            ( fall (Just Direction.Right) player, InternalUpdate )
+            ( fall (Just Direction.Right) player, EmitSound "fall" )
 
         ( [ _, Level.Empty ], Lying Direction.Up ) ->
-            ( fall (Just Direction.Down) player, InternalUpdate )
+            ( fall (Just Direction.Down) player, EmitSound "fall" )
 
         ( [ _, Level.Empty ], Lying Direction.Down ) ->
-            ( fall (Just Direction.Down) player, InternalUpdate )
+            ( fall (Just Direction.Down) player, EmitSound "fall" )
 
         -- Stomp on rusty tile
         ( [ Level.RustyFloor ], Standing ) ->
-            ( Player (FallingWithTheFloor 0) ( x, y ), InternalUpdate )
+            ( Player (FallingWithTheFloor 0) ( x, y ), EmitSound "break-tile" )
 
         ( [], FallingWithTheFloor progress ) ->
             if progress >= 30 then
@@ -557,7 +597,7 @@ interact level ((Player state ( x, y )) as player) =
 
         -- Success
         ( [ Level.Finish ], _ ) ->
-            ( Player (SlideIn 0) ( x, y ), InternalUpdate )
+            ( Player (SlideIn 0) ( x, y ), EmitSound "slide-in" )
 
         ( [], SlideIn progress ) ->
             ( player

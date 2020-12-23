@@ -63,13 +63,13 @@ update msg model =
     case ( model.screen, msg ) of
         ( GameScreen game, GameMsg gameMsg ) ->
             case Screen.Game.update gameMsg game of
-                ( updatedGame, Screen.Game.NoOp ) ->
-                    ( { model | screen = GameScreen updatedGame }, Cmd.none )
+                ( updatedGame, cmd, Screen.Game.NoOp ) ->
+                    ( { model | screen = GameScreen updatedGame }, cmd )
 
-                ( updatedGame, Screen.Game.SaveGame levelIndex ) ->
+                ( updatedGame, _, Screen.Game.SaveGame levelIndex ) ->
                     ( { model | screen = GameScreen updatedGame, lastLevel = levelIndex }, saveGame levelIndex )
 
-                ( _, Screen.Game.GameFinished ) ->
+                ( _, _, Screen.Game.GameFinished ) ->
                     ( { model | screen = CongratulationsScreen Screen.Congratulations.init, lastLevel = 0 }, saveGame 0 )
 
         ( MenuScreen _, MenuAction Screen.Menu.StartGame ) ->

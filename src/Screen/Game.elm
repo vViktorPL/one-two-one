@@ -19,6 +19,7 @@ import Screen.Game.Direction as Direction exposing (Direction)
 import Screen.Game.Level as Level exposing (Level)
 import Screen.Game.Level.Index as LevelIndex
 import Screen.Game.Player as Player exposing (Player)
+import Sound
 import Vector3d
 import Viewpoint3d
 
@@ -79,15 +80,18 @@ controlPlayer control player =
             player
 
 
-update : Msg -> Game -> ( Game, MsgOut )
+update : Msg -> Game -> ( Game, Cmd msg, MsgOut )
 update msg (Game game) =
     case msg of
         Tick delta ->
             let
-                ( updatedPlayer, interactionMsg ) =
+                ( animatedPlayer, playerCmd ) =
                     game.player
                         |> controlPlayer game.control
-                        |> Player.update delta
+                        |> Player.update delta game.level
+
+                ( updatedPlayer, interactionMsg ) =
+                    animatedPlayer
                         |> Player.interact game.level
 
                 updatedLevel =
@@ -96,7 +100,7 @@ update msg (Game game) =
             in
             case interactionMsg of
                 Player.InternalUpdate ->
-                    ( Game { game | player = updatedPlayer, level = updatedLevel }, NoOp )
+                    ( Game { game | player = updatedPlayer, level = updatedLevel }, playerCmd, NoOp )
 
                 Player.FinishedLevel ->
                     case game.levelsLeft of
@@ -108,11 +112,12 @@ update msg (Game game) =
                                 , control = Nothing
                                 , mobile = game.mobile
                                 }
+                            , playerCmd
                             , SaveGame (List.length LevelIndex.restLevels - List.length rest)
                             )
 
                         [] ->
-                            ( Game game, GameFinished )
+                            ( Game game, playerCmd, GameFinished )
 
                 Player.PushDownTile zOffset ->
                     ( Game
@@ -120,8 +125,12 @@ update msg (Game game) =
                             | player = updatedPlayer
                             , level = Level.shiftTile (Player.getPosition updatedPlayer) zOffset game.level
                         }
+                    , playerCmd
                     , NoOp
                     )
+
+                Player.EmitSound filename ->
+                    ( Game { game | player = updatedPlayer, level = updatedLevel }, Sound.playSound filename, NoOp )
 
                 Player.TriggerActions actions ->
                     let
@@ -129,19 +138,22 @@ update msg (Game game) =
                             game.player
                                 |> Player.interact game.level
                                 |> Tuple.second
+
+                        ( actionUpdatedLevel, actionCommand ) =
+                            case previousInteractionMsg of
+                                Player.TriggerActions _ ->
+                                    ( updatedLevel, playerCmd )
+
+                                _ ->
+                                    -- Trigger only if not trigged in last update already
+                                    Level.triggerActions actions updatedLevel
                     in
                     ( Game
                         { game
                             | player = updatedPlayer
-                            , level =
-                                case previousInteractionMsg of
-                                    Player.TriggerActions _ ->
-                                        updatedLevel
-
-                                    _ ->
-                                        -- Trigger only if not trigged in last update already
-                                        Level.triggerActions actions updatedLevel
+                            , level = actionUpdatedLevel
                         }
+                    , actionCommand
                     , NoOp
                     )
 
@@ -151,6 +163,7 @@ update msg (Game game) =
                             | player = updatedPlayer
                             , level = Level.restart game.level
                         }
+                    , playerCmd
                     , NoOp
                     )
 
@@ -160,6 +173,7 @@ update msg (Game game) =
                 |> Maybe.map (\direction -> { game | control = Just direction })
                 |> Maybe.withDefault game
                 |> Game
+            , Cmd.none
             , NoOp
             )
 
@@ -169,6 +183,7 @@ update msg (Game game) =
 
               else
                 Game game
+            , Cmd.none
             , NoOp
             )
 

@@ -13,6 +13,7 @@ import Scene3d
 import Scene3d.Material as Material
 import Screen.Game.Constant as Constant
 import Screen.Game.Direction exposing (Direction(..))
+import Sound
 import Vector3d
 
 
@@ -100,11 +101,11 @@ shiftTile location zOffset (Level level) =
     Level { level | tileStates = Dict.insert location (PushDown zOffset) level.tileStates }
 
 
-triggerActions : List TriggerAction -> Level -> Level
+triggerActions : List TriggerAction -> Level -> ( Level, Cmd a )
 triggerActions actions level =
     List.foldl
-        (\action levelAcc ->
-            case action of
+        (\action ( levelAcc, cmdAcc ) ->
+            (case action of
                 ToggleBridge ( x, y ) ->
                     toggleBridge not ( x, y ) levelAcc
 
@@ -113,16 +114,24 @@ triggerActions actions level =
 
                 OpenBridge ( x, y ) ->
                     toggleBridge (always False) ( x, y ) levelAcc
+            )
+                |> Tuple.mapSecond (\cmd -> Cmd.batch [ cmdAcc, cmd ])
         )
-        level
+        ( level, Cmd.none )
         actions
 
 
-toggleBridge : (Bool -> Bool) -> ( Int, Int ) -> Level -> Level
+toggleBridge : (Bool -> Bool) -> ( Int, Int ) -> Level -> ( Level, Cmd a )
 toggleBridge mapPreviousState ( x, y ) (Level level) =
     case Dict.get ( x, y ) level.tileStates of
         Just (BridgeState closed progress) ->
-            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState (mapPreviousState closed) progress) level.tileStates }
+            ( Level { level | tileStates = Dict.insert ( x, y ) (BridgeState (mapPreviousState closed) progress) level.tileStates }
+            , if mapPreviousState closed then
+                Sound.playSound "bridge-close"
+
+              else
+                Sound.playSound "bridge-open"
+            )
 
         _ ->
             let
@@ -144,7 +153,13 @@ toggleBridge mapPreviousState ( x, y ) (Level level) =
                     else
                         1
             in
-            Level { level | tileStates = Dict.insert ( x, y ) (BridgeState newClosed progress) level.tileStates }
+            ( Level { level | tileStates = Dict.insert ( x, y ) (BridgeState newClosed progress) level.tileStates }
+            , if newClosed then
+                Sound.playSound "bridge-close"
+
+              else
+                Sound.playSound "bridge-open"
+            )
 
 
 restart : Level -> Level
