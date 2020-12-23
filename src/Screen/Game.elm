@@ -62,7 +62,7 @@ init mobile levelStartIndex =
                     ( LevelIndex.firstLevel, LevelIndex.restLevels )
     in
     Game
-        { player = Player.init (Level.getStartingPosition LevelIndex.firstLevel)
+        { player = Player.init (Level.getStartingPosition level)
         , level = level
         , levelsLeft = levelsLeft
         , control = Nothing
