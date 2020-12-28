@@ -30,11 +30,14 @@ type TriggerAction
     = ToggleBridge ( Int, Int )
     | CloseBridge ( Int, Int )
     | OpenBridge ( Int, Int )
+    | SetTriggerColor ( Int, Int ) Color
+    | ToggleTriggerColor ( Int, Int ) Color
 
 
 type TileState
     = PushDown Length
     | BridgeState Bool Float
+    | TriggerState Color
 
 
 type Level
@@ -102,7 +105,7 @@ shiftTile location zOffset (Level level) =
 
 
 triggerActions : List TriggerAction -> Level -> ( Level, Cmd a )
-triggerActions actions level =
+triggerActions actions ((Level levelData) as level) =
     List.foldl
         (\action ( levelAcc, cmdAcc ) ->
             (case action of
@@ -114,6 +117,25 @@ triggerActions actions level =
 
                 OpenBridge ( x, y ) ->
                     toggleBridge (always False) ( x, y ) levelAcc
+
+                SetTriggerColor ( x, y ) newColor ->
+                    ( Level { levelData | tileStates = Dict.insert ( x, y ) (TriggerState newColor) levelData.tileStates }
+                    , Cmd.none
+                    )
+
+                ToggleTriggerColor ( x, y ) secondColor ->
+                    ( Level
+                        { levelData
+                            | tileStates =
+                                case Dict.get ( x, y ) levelData.tileStates of
+                                    Just _ ->
+                                        Dict.remove ( x, y ) levelData.tileStates
+
+                                    Nothing ->
+                                        Dict.insert ( x, y ) (TriggerState secondColor) levelData.tileStates
+                        }
+                    , Cmd.none
+                    )
             )
                 |> Tuple.mapSecond (\cmd -> Cmd.batch [ cmdAcc, cmd ])
         )
@@ -212,8 +234,16 @@ view (Level { tiles, tileStates }) =
                                                 identity
                                        )
 
-                            Trigger color _ ->
-                                floorEntity color ( x, y )
+                            Trigger initialColor _ ->
+                                triggerEntity
+                                    (case Dict.get ( x, y ) tileStates of
+                                        Just (TriggerState color) ->
+                                            color
+
+                                        _ ->
+                                            initialColor
+                                    )
+                                    ( x, y )
 
                             Bridge openingDirection initiallyClosed ->
                                 floorEntity Color.darkYellow ( x, y )
@@ -275,3 +305,24 @@ floorEntity color ( x, y ) =
             , z2 = Length.centimeters 0
             }
         )
+
+
+triggerEntity color ( x, y ) =
+    let
+        buttonPaddingCm =
+            Constant.tileSizeCm * 0.2
+    in
+    Scene3d.group
+        [ floorEntity Color.gray ( x, y )
+        , Scene3d.block
+            (Material.matte color)
+            (Block3d.with
+                { x1 = Length.centimeters (Constant.tileSizeCm * toFloat x + buttonPaddingCm)
+                , x2 = Length.centimeters (Constant.tileSizeCm * toFloat (x + 1) - buttonPaddingCm)
+                , y1 = Length.centimeters (Constant.tileSizeCm * toFloat y + buttonPaddingCm)
+                , y2 = Length.centimeters (Constant.tileSizeCm * toFloat (y + 1) - buttonPaddingCm)
+                , z1 = Length.centimeters 0
+                , z2 = Length.centimeters (Constant.tileSizeCm * 0.1)
+                }
+            )
+        ]

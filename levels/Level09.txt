@@ -7,8 +7,8 @@ S###RRR
  1    ###
 
 ---
-1 Trigger Color.red [ToggleBridge @[, ToggleBridge @*, ToggleBridge @]]
-2 Trigger Color.red [ToggleBridge @$]
+1 Trigger Color.red [ToggleTriggerColor @1 Color.green, ToggleBridge @[, ToggleBridge @*, ToggleBridge @]]
+2 Trigger Color.red [ToggleTriggerColor @2 Color.green, ToggleBridge @$]
 [ Bridge Up False
 * Bridge Up False
 ] Bridge Up False

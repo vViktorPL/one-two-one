@@ -14,6 +14,6 @@
 A Bridge Up False
 B Bridge Up False
 C Bridge Up True
-1 Trigger Color.red [ToggleBridge @A]
-2 Trigger Color.red [OpenBridge @C]
-3 Trigger Color.red [ToggleBridge @B]
+1 Trigger Color.red [ToggleTriggerColor @1 Color.green, ToggleBridge @A]
+2 Trigger Color.green [SetTriggerColor @2 Color.red, OpenBridge @C]
+3 Trigger Color.red [ToggleTriggerColor @3 Color.green, ToggleBridge @B]
