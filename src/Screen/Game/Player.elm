@@ -624,13 +624,13 @@ interact level ((Player state ( x, y )) as player) =
                 ( player, InternalUpdate )
 
         -- Trigger activation
-        ( [ Level.Trigger actions, _ ], Lying _ ) ->
+        ( [ Level.Trigger _ actions, _ ], Lying _ ) ->
             ( player, TriggerActions actions )
 
-        ( [ _, Level.Trigger actions ], Lying _ ) ->
+        ( [ _, Level.Trigger _ actions ], Lying _ ) ->
             ( player, TriggerActions actions )
 
-        ( [ Level.Trigger actions ], Standing ) ->
+        ( [ Level.Trigger _ actions ], Standing ) ->
             ( player, TriggerActions actions )
 
         -- Nothing to be done

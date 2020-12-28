@@ -10,5 +10,5 @@
 ] Bridge Right True
 < Bridge Left False
 > Bridge Right False
-1 Trigger [ToggleBridge @<, ToggleBridge @>]
-2 Trigger [ToggleBridge @[, ToggleBridge @], ToggleBridge @<, ToggleBridge @>]
+1 Trigger Color.red [ToggleBridge @<, ToggleBridge @>]
+2 Trigger Color.red [ToggleBridge @[, ToggleBridge @], ToggleBridge @<, ToggleBridge @>]

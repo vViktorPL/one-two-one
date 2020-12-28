@@ -6,4 +6,4 @@
 ---
 [ Bridge Left False
 ] Bridge Right False
-o Trigger [ToggleBridge @[, ToggleBridge @]]
+o Trigger Color.red [ToggleBridge @[, ToggleBridge @]]

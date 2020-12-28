@@ -4,7 +4,7 @@ import Angle exposing (Angle)
 import Array exposing (Array)
 import Axis3d
 import Block3d
-import Color
+import Color exposing (Color)
 import Dict exposing (Dict)
 import Direction3d
 import Length exposing (Length)
@@ -23,7 +23,7 @@ type LevelTile
     | RustyFloor
     | Finish
     | Bridge Direction Bool
-    | Trigger (List TriggerAction)
+    | Trigger Color (List TriggerAction)
 
 
 type TriggerAction
@@ -212,8 +212,8 @@ view (Level { tiles, tileStates }) =
                                                 identity
                                        )
 
-                            Trigger _ ->
-                                floorEntity Color.red ( x, y )
+                            Trigger color _ ->
+                                floorEntity color ( x, y )
 
                             Bridge openingDirection initiallyClosed ->
                                 floorEntity Color.darkYellow ( x, y )
