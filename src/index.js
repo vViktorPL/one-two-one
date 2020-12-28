@@ -23,12 +23,12 @@ const app = Elm.Main.init({
   node: document.getElementById('app'),
   flags: {
     mobile: 'ontouchstart' in document.documentElement,
-    lastLevel: parseInt(localStorage.getItem("lastLevel") || "0")
+    lastLevel: parseInt(window.localStorage?.getItem("lastLevel") || "0")
   },
 });
 
 app.ports.saveGame.subscribe(lastLevel => {
-  localStorage.setItem("lastLevel", String(lastLevel));
+  localStorage?.setItem("lastLevel", String(lastLevel));
 });
 
 app.ports.playSound.subscribe(filename => {
