@@ -223,7 +223,7 @@ view ( width, height ) (Game { player, level, mobile }) =
             , style "text-align" "center"
             ]
             [ Html.text
-                (if Player.isSplit player then
+                (if not mobile && Player.isSplit player then
                     "Press spacebar to select another cube"
 
                  else
@@ -241,7 +241,7 @@ view ( width, height ) (Game { player, level, mobile }) =
             , dimensions = ( Pixels.int width, Pixels.int height )
             }
         , if mobile then
-            mobileControls
+            mobileControls player
 
           else
             Html.text ""
@@ -256,8 +256,8 @@ onTouchEnd msg =
     Event.on "touchend" (Decode.succeed msg)
 
 
-mobileControls : Html Msg
-mobileControls =
+mobileControls : Player -> Html Msg
+mobileControls player =
     Html.div
         [ style "position" "absolute"
         , style "right" "0"
@@ -300,6 +300,21 @@ mobileControls =
             , style "left" "10vw"
             ]
             [ Html.text "⬇️️️" ]
+        , Html.div
+            [ onTouchStart (KeyDown " ")
+            , style "display"
+                (if Player.isSplit player then
+                    "block"
+
+                 else
+                    "none"
+                )
+            , style "position" "absolute"
+            , style "top" "9vw"
+            , style "left" "10vw"
+            , style "right" "9vw"
+            ]
+            [ Html.text "🔄" ]
         ]
 
 
