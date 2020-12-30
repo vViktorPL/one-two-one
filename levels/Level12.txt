@@ -1,0 +1,13 @@
+  o##     #
+  ###    #1#
+    #     #
+######   ###
+#S####RRR#F#
+######   ###
+    #     #
+  ###    #2#
+  ###     #
+---
+o Trigger Color.yellow [SplitToCubes @1 @2]
+1 Trigger Color.blue []
+2 Trigger Color.blue []

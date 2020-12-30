@@ -167,6 +167,12 @@ update msg (Game game) =
                     , NoOp
                     )
 
+        KeyDown " " ->
+            ( Game { game | player = Player.toggleSelectedCube game.player }
+            , Cmd.none
+            , NoOp
+            )
+
         KeyDown key ->
             ( key
                 |> keyToDirection
@@ -207,7 +213,24 @@ view ( width, height ) (Game { player, level, mobile }) =
                 }
     in
     Html.div []
-        [ Scene3d.sunny
+        [ Html.div
+            [ style "position" "absolute"
+            , style "top" "0"
+            , style "left" "0"
+            , style "right" "0"
+            , style "color" "black"
+            , style "font-size" "25px"
+            , style "text-align" "center"
+            ]
+            [ Html.text
+                (if Player.isSplit player then
+                    "Press spacebar to select another cube"
+
+                 else
+                    ""
+                )
+            ]
+        , Scene3d.sunny
             { entities = [ Player.view player, Level.view level ]
             , camera = camera
             , upDirection = Direction3d.z

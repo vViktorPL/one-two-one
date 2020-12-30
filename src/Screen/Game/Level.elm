@@ -32,6 +32,7 @@ type TriggerAction
     | OpenBridge ( Int, Int )
     | SetTriggerColor ( Int, Int ) Color
     | ToggleTriggerColor ( Int, Int ) Color
+    | SplitToCubes ( Int, Int ) ( Int, Int )
 
 
 type TileState
@@ -135,6 +136,11 @@ triggerActions actions ((Level levelData) as level) =
                                         Dict.insert ( x, y ) (TriggerState secondColor) levelData.tileStates
                         }
                     , Cmd.none
+                    )
+
+                SplitToCubes _ _ ->
+                    ( level
+                    , Sound.playSound "split"
                     )
             )
                 |> Tuple.mapSecond (\cmd -> Cmd.batch [ cmdAcc, cmd ])

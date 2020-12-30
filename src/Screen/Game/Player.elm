@@ -1,9 +1,10 @@
-module Screen.Game.Player exposing (InteractionMsg(..), Player, fall, getPosition, init, interact, move, update, view)
+module Screen.Game.Player exposing (InteractionMsg(..), Player, fall, getPosition, init, interact, isSplit, move, toggleSelectedCube, update, view)
 
 import Angle
 import Axis3d
 import Block3d
 import Color
+import Cone3d
 import Direction3d
 import Length exposing (Length)
 import Point3d
@@ -17,7 +18,8 @@ import Vector3d
 
 
 type Player
-    = Player BlockAnimationState ( Int, Int )
+    = Cuboid BlockAnimationState ( Int, Int )
+    | Cubes ( Cube, Cube )
 
 
 type BlockAnimationState
@@ -34,6 +36,16 @@ type BlockAnimationState
     | FallingWithTheFloor Float
 
 
+type Cube
+    = Cube CubeAnimationState ( Int, Int )
+
+
+type CubeAnimationState
+    = Stable
+    | Rotating Direction Float
+    | Falling Float
+
+
 type InteractionMsg
     = InternalUpdate
     | FinishedLevel
@@ -45,20 +57,25 @@ type InteractionMsg
 
 init : ( Int, Int ) -> Player
 init ( x, y ) =
-    Player (FallingFromTheSky 0) ( x, y )
+    Cuboid (FallingFromTheSky 0) ( x, y )
+
+
+initCubes : ( Int, Int ) -> ( Int, Int ) -> Player
+initCubes position1 position2 =
+    Cubes ( Cube Stable position1, Cube Stable position2 )
 
 
 update : Float -> Level -> Player -> ( Player, Cmd msg )
 update delta level player =
     case player of
-        Player (KnockingOver direction progress) ( x, y ) ->
+        Cuboid (KnockingOver direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
 
                 newPlayer =
                     if newProgress >= 1 then
-                        Player
+                        Cuboid
                             (Lying direction)
                             (case direction of
                                 Direction.Up ->
@@ -75,7 +92,7 @@ update delta level player =
                             )
 
                     else
-                        Player (KnockingOver direction newProgress) ( x, y )
+                        Cuboid (KnockingOver direction newProgress) ( x, y )
             in
             ( newPlayer
             , if newProgress < 1 || unstablePosition newPlayer level then
@@ -85,17 +102,17 @@ update delta level player =
                 Sound.playSound "lay"
             )
 
-        Player (GettingUp direction progress) ( x, y ) ->
+        Cuboid (GettingUp direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
 
                 newPlayer =
                     if newProgress >= 1 then
-                        Player Standing ( x, y )
+                        Cuboid Standing ( x, y )
 
                     else
-                        Player (GettingUp direction newProgress) ( x, y )
+                        Cuboid (GettingUp direction newProgress) ( x, y )
             in
             ( newPlayer
             , if newProgress < 1 || unstablePosition newPlayer level then
@@ -105,7 +122,7 @@ update delta level player =
                 Sound.playSound "stand"
             )
 
-        Player (Rolling direction progress) ( x, y ) ->
+        Cuboid (Rolling direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed
@@ -114,19 +131,19 @@ update delta level player =
                     if newProgress >= 1 then
                         case direction of
                             Direction.Left ->
-                                Player (Lying Direction.Up) ( x, y - 1 )
+                                Cuboid (Lying Direction.Up) ( x, y - 1 )
 
                             Direction.Right ->
-                                Player (Lying Direction.Up) ( x, y + 1 )
+                                Cuboid (Lying Direction.Up) ( x, y + 1 )
 
                             Direction.Up ->
-                                Player (Lying Direction.Right) ( x - 1, y )
+                                Cuboid (Lying Direction.Right) ( x - 1, y )
 
                             Direction.Down ->
-                                Player (Lying Direction.Right) ( x + 1, y )
+                                Cuboid (Lying Direction.Right) ( x + 1, y )
 
                     else
-                        Player (Rolling direction newProgress) ( x, y )
+                        Cuboid (Rolling direction newProgress) ( x, y )
             in
             ( newPlayer
             , if newProgress < 1 || unstablePosition newPlayer level then
@@ -136,20 +153,20 @@ update delta level player =
                 Sound.playSound "lay"
             )
 
-        Player (SlideIn progress) ( x, y ) ->
+        Cuboid (SlideIn progress) ( x, y ) ->
             let
                 newProgress =
                     min (progress + delta * Constant.animationSpeed * 0.5) 1
             in
-            ( Player (SlideIn newProgress) ( x, y ), Cmd.none )
+            ( Cuboid (SlideIn newProgress) ( x, y ), Cmd.none )
 
-        Player (FallingUnbalanced direction progress) ( x, y ) ->
+        Cuboid (FallingUnbalanced direction progress) ( x, y ) ->
             let
                 newProgress =
                     min (progress + delta * Constant.animationSpeed) 1
             in
             if newProgress == 1 then
-                ( Player (FallingInVerticalOrientation { zOffset = Length.centimeters (0.5 * Constant.playerHeightCm), progress = 0 })
+                ( Cuboid (FallingInVerticalOrientation { zOffset = Length.centimeters (0.5 * Constant.playerHeightCm), progress = 0 })
                     (case direction of
                         Direction.Left ->
                             ( x, y - 1 )
@@ -167,48 +184,332 @@ update delta level player =
                 )
 
             else
-                ( Player (FallingUnbalanced direction newProgress) ( x, y ), Cmd.none )
+                ( Cuboid (FallingUnbalanced direction newProgress) ( x, y ), Cmd.none )
 
-        Player (FallingInVerticalOrientation { zOffset, progress }) ( x, y ) ->
+        Cuboid (FallingInVerticalOrientation { zOffset, progress }) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            ( Player (FallingInVerticalOrientation { zOffset = zOffset, progress = newProgress }) ( x, y ), Cmd.none )
+            ( Cuboid (FallingInVerticalOrientation { zOffset = zOffset, progress = newProgress }) ( x, y ), Cmd.none )
 
-        Player (FallingInHorizontalOrientation direction progress) ( x, y ) ->
+        Cuboid (FallingInHorizontalOrientation direction progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            ( Player (FallingInHorizontalOrientation direction newProgress) ( x, y ), Cmd.none )
+            ( Cuboid (FallingInHorizontalOrientation direction newProgress) ( x, y ), Cmd.none )
 
-        Player (FallingFromTheSky progress) ( x, y ) ->
+        Cuboid (FallingFromTheSky progress) ( x, y ) ->
             let
                 newProgress =
                     min (progress + delta * Constant.animationSpeed * 0.3) 1
             in
             if newProgress == 1 then
-                ( Player Standing ( x, y )
+                ( Cuboid Standing ( x, y )
                 , Sound.playSound "stand"
                 )
 
             else
-                ( Player (FallingFromTheSky newProgress) ( x, y ), Cmd.none )
+                ( Cuboid (FallingFromTheSky newProgress) ( x, y ), Cmd.none )
 
-        Player (FallingWithTheFloor progress) ( x, y ) ->
+        Cuboid (FallingWithTheFloor progress) ( x, y ) ->
             let
                 newProgress =
                     progress + delta * Constant.animationSpeed * min (progress + 1) 5
             in
-            ( Player (FallingWithTheFloor newProgress) ( x, y ), Cmd.none )
+            ( Cuboid (FallingWithTheFloor newProgress) ( x, y ), Cmd.none )
+
+        Cubes ( Cube (Rotating direction progress) ( x, y ), anotherCube ) ->
+            let
+                newProgress =
+                    progress + delta * Constant.animationSpeed
+
+                targetPosition =
+                    case direction of
+                        Direction.Up ->
+                            ( x - 1, y )
+
+                        Direction.Down ->
+                            ( x + 1, y )
+
+                        Direction.Left ->
+                            ( x, y - 1 )
+
+                        Direction.Right ->
+                            ( x, y + 1 )
+            in
+            if newProgress >= 1 then
+                ( Cubes ( Cube Stable targetPosition, anotherCube )
+                , Sound.playSound "stand"
+                )
+
+            else
+                ( Cubes ( Cube (Rotating direction newProgress) ( x, y ), anotherCube )
+                , Cmd.none
+                )
+
+        Cubes cubes ->
+            ( cubes
+                |> Tuple.mapBoth (cubeFallInteraction delta) (cubeFallInteraction delta)
+                |> Cubes
+            , Cmd.none
+            )
 
         plr ->
             ( plr, Cmd.none )
 
 
+cubeFallInteraction : Float -> Cube -> Cube
+cubeFallInteraction delta cube =
+    case cube of
+        Cube (Falling progress) position ->
+            let
+                newProgress =
+                    progress + delta * Constant.animationSpeed * min (progress + 1) 5
+            in
+            Cube (Falling newProgress) position
+
+        _ ->
+            cube
+
+
 view : Player -> Scene3d.Entity coordinates
-view (Player orientation ( x, y )) =
+view player =
+    case player of
+        Cuboid orientation ( x, y ) ->
+            let
+                positionX =
+                    toFloat x * Constant.tileSizeCm
+
+                positionY =
+                    toFloat y * Constant.tileSizeCm
+
+                block =
+                    Scene3d.block
+                        (Material.metal { baseColor = Color.orange, roughness = 2.5 })
+                        (Block3d.with
+                            { x1 = Length.centimeters 0
+                            , x2 = Length.centimeters Constant.playerWidthCm
+                            , y1 = Length.centimeters 0
+                            , y2 = Length.centimeters Constant.playerWidthCm
+                            , z1 = Length.centimeters 0
+                            , z2 = Length.centimeters Constant.playerHeightCm
+                            }
+                        )
+            in
+            (case orientation of
+                -- +
+                Standing ->
+                    block
+
+                -- |
+                -- 0
+                Lying Direction.Up ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+
+                -- 0-
+                Lying Direction.Right ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+
+                -- 0
+                -- |
+                Lying Direction.Down ->
+                    block
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+
+                -- -0
+                Lying Direction.Left ->
+                    block
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
+
+                KnockingOver Direction.Up progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
+
+                KnockingOver Direction.Right progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
+
+                KnockingOver Direction.Down progress ->
+                    block
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
+
+                KnockingOver Direction.Left progress ->
+                    block
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
+
+                GettingUp Direction.Up progress ->
+                    block
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees ((1 - progress) * 90))
+
+                GettingUp Direction.Right progress ->
+                    block
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees ((1 - progress) * 90))
+
+                GettingUp Direction.Down progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees ((1 - progress) * 90))
+
+                GettingUp Direction.Left progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees ((1 - progress) * 90))
+
+                Rolling Direction.Left progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
+
+                Rolling Direction.Right progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
+
+                Rolling Direction.Up progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
+
+                Rolling Direction.Down progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
+
+                SlideIn progress ->
+                    Scene3d.block
+                        (Material.metal { baseColor = Color.orange, roughness = 2.5 })
+                        (Block3d.with
+                            { x1 = Length.centimeters 0
+                            , x2 = Length.centimeters Constant.playerWidthCm
+                            , y1 = Length.centimeters 0
+                            , y2 = Length.centimeters Constant.playerWidthCm
+                            , z1 = Length.centimeters 0
+                            , z2 = Length.centimeters (Constant.playerHeightCm - (progress * progress * 2))
+                            }
+                        )
+
+                FallingUnbalanced Direction.Left progress ->
+                    block
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
+
+                FallingUnbalanced Direction.Right progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
+
+                FallingUnbalanced Direction.Up progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                        |> Scene3d.rotateAround topAxis (Angle.degrees (90 * progress))
+
+                FallingUnbalanced Direction.Down progress ->
+                    block
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
+
+                FallingInVerticalOrientation { zOffset, progress } ->
+                    block
+                        |> Scene3d.translateIn Direction3d.negativeZ zOffset
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+                FallingInHorizontalOrientation Direction.Left progress ->
+                    block
+                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+                FallingInHorizontalOrientation Direction.Up progress ->
+                    block
+                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+                FallingInHorizontalOrientation Direction.Right progress ->
+                    block
+                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+                FallingInHorizontalOrientation Direction.Down progress ->
+                    block
+                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+
+                FallingFromTheSky progress ->
+                    block
+                        |> Scene3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
+
+                FallingWithTheFloor progress ->
+                    block
+                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+            )
+                |> Scene3d.translateBy
+                    (Vector3d.centimeters positionX positionY 0)
+
+        Cubes ( cube1, cube2 ) ->
+            Scene3d.group
+                [ viewCube cube1
+                , viewCube cube2
+                , viewSelectedCubeMarker cube1
+                ]
+
+
+viewSelectedCubeMarker : Cube -> Scene3d.Entity coordinates
+viewSelectedCubeMarker (Cube state ( x, y )) =
+    let
+        ( offsetX, offsetY ) =
+            case state of
+                Rotating Direction.Up progress ->
+                    ( -progress, 0 )
+
+                Rotating Direction.Down progress ->
+                    ( progress, 0 )
+
+                Rotating Direction.Left progress ->
+                    ( 0, -progress )
+
+                Rotating Direction.Right progress ->
+                    ( 0, progress )
+
+                _ ->
+                    ( 0, 0 )
+
+        positionX =
+            toFloat x + 0.5 + offsetX * Constant.tileSizeCm
+
+        positionY =
+            toFloat y + 0.5 + offsetY * Constant.tileSizeCm
+    in
+    Scene3d.cone
+        (Material.color Color.red)
+        (Cone3d.along Axis3d.z
+            { base = Length.centimeters (Constant.tileSizeCm * 1.5)
+            , tip = Length.centimeters (Constant.tileSizeCm * 1.2)
+            , radius = Length.centimeters (Constant.tileSizeCm * 0.1)
+            }
+        )
+        |> Scene3d.translateBy
+            (Vector3d.centimeters positionX positionY 0)
+
+
+viewCube : Cube -> Scene3d.Entity coordinates
+viewCube (Cube state ( x, y )) =
     let
         positionX =
             toFloat x * Constant.tileSizeCm
@@ -216,7 +517,7 @@ view (Player orientation ( x, y )) =
         positionY =
             toFloat y * Constant.tileSizeCm
 
-        block =
+        cube =
             Scene3d.block
                 (Material.metal { baseColor = Color.orange, roughness = 2.5 })
                 (Block3d.with
@@ -225,169 +526,32 @@ view (Player orientation ( x, y )) =
                     , y1 = Length.centimeters 0
                     , y2 = Length.centimeters Constant.playerWidthCm
                     , z1 = Length.centimeters 0
-                    , z2 = Length.centimeters Constant.playerHeightCm
+                    , z2 = Length.centimeters Constant.playerWidthCm
                     }
                 )
     in
-    (case orientation of
-        -- +
-        Standing ->
-            block
+    (case state of
+        Stable ->
+            cube
 
-        -- |
-        -- 0
-        Lying Direction.Up ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.x Constant.tileSize
-
-        -- 0-
-        Lying Direction.Right ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-
-        -- 0
-        -- |
-        Lying Direction.Down ->
-            block
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
-
-        -- -0
-        Lying Direction.Left ->
-            block
-                |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.y Constant.tileSize
-
-        KnockingOver Direction.Up progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
-
-        KnockingOver Direction.Right progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
-
-        KnockingOver Direction.Down progress ->
-            block
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
-
-        KnockingOver Direction.Left progress ->
-            block
-                |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
-
-        GettingUp Direction.Up progress ->
-            block
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees ((1 - progress) * 90))
-
-        GettingUp Direction.Right progress ->
-            block
-                |> Scene3d.rotateAround leftAxis (Angle.degrees ((1 - progress) * 90))
-
-        GettingUp Direction.Down progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees ((1 - progress) * 90))
-
-        GettingUp Direction.Left progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees ((1 - progress) * 90))
-
-        Rolling Direction.Left progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
-
-        Rolling Direction.Right progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
-
-        Rolling Direction.Up progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
-
-        Rolling Direction.Down progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
-
-        SlideIn progress ->
-            Scene3d.block
-                (Material.metal { baseColor = Color.orange, roughness = 2.5 })
-                (Block3d.with
-                    { x1 = Length.centimeters 0
-                    , x2 = Length.centimeters Constant.playerWidthCm
-                    , y1 = Length.centimeters 0
-                    , y2 = Length.centimeters Constant.playerWidthCm
-                    , z1 = Length.centimeters 0
-                    , z2 = Length.centimeters (Constant.playerHeightCm - (progress * progress * 2))
-                    }
-                )
-
-        FallingUnbalanced Direction.Left progress ->
-            block
-                |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.y Constant.tileSize
-                |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
-
-        FallingUnbalanced Direction.Right progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
-
-        FallingUnbalanced Direction.Up progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.x Constant.tileSize
+        Rotating Direction.Up progress ->
+            cube
                 |> Scene3d.rotateAround topAxis (Angle.degrees (90 * progress))
 
-        FallingUnbalanced Direction.Down progress ->
-            block
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+        Rotating Direction.Down progress ->
+            cube
                 |> Scene3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
 
-        FallingInVerticalOrientation { zOffset, progress } ->
-            block
-                |> Scene3d.translateIn Direction3d.negativeZ zOffset
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+        Rotating Direction.Right progress ->
+            cube
+                |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
 
-        FallingInHorizontalOrientation Direction.Left progress ->
-            block
-                |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.y Constant.tileSize
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+        Rotating Direction.Left progress ->
+            cube
+                |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
 
-        FallingInHorizontalOrientation Direction.Up progress ->
-            block
-                |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
-
-        FallingInHorizontalOrientation Direction.Right progress ->
-            block
-                |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
-
-        FallingInHorizontalOrientation Direction.Down progress ->
-            block
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
-
-        FallingFromTheSky progress ->
-            block
-                |> Scene3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
-
-        FallingWithTheFloor progress ->
-            block
+        Falling progress ->
+            cube
                 |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
     )
         |> Scene3d.translateBy
@@ -410,128 +574,168 @@ leftAxis =
     Axis3d.through (Point3d.centimeters 0 0 0) Direction3d.x
 
 
-move : Direction -> Player -> Player
-move direction (Player orientation ( x, y )) =
-    case ( orientation, direction ) of
-        ( Standing, fallDirection ) ->
-            Player (KnockingOver fallDirection 0) ( x, y )
+toggleSelectedCube : Player -> Player
+toggleSelectedCube player =
+    case player of
+        Cubes ( Cube Stable previouslySelectedCubePosition, anotherCube ) ->
+            Cubes ( anotherCube, Cube Stable previouslySelectedCubePosition )
 
-        -- Lying Up
-        ( Lying Direction.Up, Direction.Left ) ->
-            Player (Rolling Direction.Left 0) ( x, y )
-
-        ( Lying Direction.Up, Direction.Right ) ->
-            Player (Rolling Direction.Right 0) ( x, y )
-
-        ( Lying Direction.Up, Direction.Up ) ->
-            Player (GettingUp Direction.Up 0) ( x - 2, y )
-
-        ( Lying Direction.Up, Direction.Down ) ->
-            Player (GettingUp Direction.Down 0) ( x + 1, y )
-
-        -- Lying Right
-        ( Lying Direction.Right, Direction.Up ) ->
-            Player (Rolling Direction.Up 0) ( x, y )
-
-        ( Lying Direction.Right, Direction.Down ) ->
-            Player (Rolling Direction.Down 0) ( x, y )
-
-        ( Lying Direction.Right, Direction.Left ) ->
-            Player (GettingUp Direction.Left 0) ( x, y - 1 )
-
-        ( Lying Direction.Right, Direction.Right ) ->
-            Player (GettingUp Direction.Right 0) ( x, y + 2 )
-
-        -- Lying Down
-        ( Lying Direction.Down, Direction.Up ) ->
-            Player (GettingUp Direction.Up 0) ( x - 1, y )
-
-        ( Lying Direction.Down, Direction.Down ) ->
-            Player (GettingUp Direction.Down 0) ( x + 2, y )
-
-        ( Lying Direction.Down, Direction.Left ) ->
-            Player (Rolling Direction.Left 0) ( x + 1, y )
-
-        ( Lying Direction.Down, Direction.Right ) ->
-            Player (Rolling Direction.Right 0) ( x + 1, y )
-
-        -- Lying Left
-        ( Lying Direction.Left, Direction.Up ) ->
-            Player (Rolling Direction.Up 0) ( x, y - 1 )
-
-        ( Lying Direction.Left, Direction.Down ) ->
-            Player (Rolling Direction.Down 0) ( x, y - 1 )
-
-        ( Lying Direction.Left, Direction.Left ) ->
-            Player (GettingUp Direction.Left 0) ( x, y - 2 )
-
-        ( Lying Direction.Left, Direction.Right ) ->
-            Player (GettingUp Direction.Right 0) ( x, y + 1 )
-
-        -- Player already in motion (ignore)
         _ ->
-            Player orientation ( x, y )
+            player
+
+
+move : Direction -> Player -> Player
+move direction player =
+    case player of
+        Cuboid orientation ( x, y ) ->
+            case ( orientation, direction ) of
+                ( Standing, fallDirection ) ->
+                    Cuboid (KnockingOver fallDirection 0) ( x, y )
+
+                -- Lying Up
+                ( Lying Direction.Up, Direction.Left ) ->
+                    Cuboid (Rolling Direction.Left 0) ( x, y )
+
+                ( Lying Direction.Up, Direction.Right ) ->
+                    Cuboid (Rolling Direction.Right 0) ( x, y )
+
+                ( Lying Direction.Up, Direction.Up ) ->
+                    Cuboid (GettingUp Direction.Up 0) ( x - 2, y )
+
+                ( Lying Direction.Up, Direction.Down ) ->
+                    Cuboid (GettingUp Direction.Down 0) ( x + 1, y )
+
+                -- Lying Right
+                ( Lying Direction.Right, Direction.Up ) ->
+                    Cuboid (Rolling Direction.Up 0) ( x, y )
+
+                ( Lying Direction.Right, Direction.Down ) ->
+                    Cuboid (Rolling Direction.Down 0) ( x, y )
+
+                ( Lying Direction.Right, Direction.Left ) ->
+                    Cuboid (GettingUp Direction.Left 0) ( x, y - 1 )
+
+                ( Lying Direction.Right, Direction.Right ) ->
+                    Cuboid (GettingUp Direction.Right 0) ( x, y + 2 )
+
+                -- Lying Down
+                ( Lying Direction.Down, Direction.Up ) ->
+                    Cuboid (GettingUp Direction.Up 0) ( x - 1, y )
+
+                ( Lying Direction.Down, Direction.Down ) ->
+                    Cuboid (GettingUp Direction.Down 0) ( x + 2, y )
+
+                ( Lying Direction.Down, Direction.Left ) ->
+                    Cuboid (Rolling Direction.Left 0) ( x + 1, y )
+
+                ( Lying Direction.Down, Direction.Right ) ->
+                    Cuboid (Rolling Direction.Right 0) ( x + 1, y )
+
+                -- Lying Left
+                ( Lying Direction.Left, Direction.Up ) ->
+                    Cuboid (Rolling Direction.Up 0) ( x, y - 1 )
+
+                ( Lying Direction.Left, Direction.Down ) ->
+                    Cuboid (Rolling Direction.Down 0) ( x, y - 1 )
+
+                ( Lying Direction.Left, Direction.Left ) ->
+                    Cuboid (GettingUp Direction.Left 0) ( x, y - 2 )
+
+                ( Lying Direction.Left, Direction.Right ) ->
+                    Cuboid (GettingUp Direction.Right 0) ( x, y + 1 )
+
+                -- Player already in motion (ignore)
+                _ ->
+                    Cuboid orientation ( x, y )
+
+        Cubes ( Cube Stable ( x, y ), anotherCube ) ->
+            Cubes ( Cube (Rotating direction 0) ( x, y ), anotherCube )
+
+        _ ->
+            player
 
 
 getPosition : Player -> ( Int, Int )
-getPosition (Player _ position) =
-    position
+getPosition player =
+    case player of
+        Cuboid _ position ->
+            position
+
+        Cubes ( Cube _ position, _ ) ->
+            position
 
 
 fall : Maybe Direction -> Player -> Player
-fall unbalancedDirection (Player state ( x, y )) =
-    case ( unbalancedDirection, state ) of
-        ( _, Standing ) ->
-            Player (FallingInVerticalOrientation { zOffset = Length.centimeters 0, progress = 0 }) ( x, y )
+fall unbalancedDirection player =
+    case player of
+        Cubes ( Cube _ ( x, y ), anotherCube ) ->
+            Cubes ( Cube (Falling 0) ( x, y ), anotherCube )
 
-        ( Just Direction.Left, Lying Direction.Left ) ->
-            Player (FallingUnbalanced Direction.Left 0) ( x, y )
+        Cuboid state ( x, y ) ->
+            case ( unbalancedDirection, state ) of
+                ( _, Standing ) ->
+                    Cuboid (FallingInVerticalOrientation { zOffset = Length.centimeters 0, progress = 0 }) ( x, y )
 
-        ( Just Direction.Left, Lying Direction.Right ) ->
-            Player (FallingUnbalanced Direction.Left 0) ( x, y + 1 )
+                ( Just Direction.Left, Lying Direction.Left ) ->
+                    Cuboid (FallingUnbalanced Direction.Left 0) ( x, y )
 
-        ( Just Direction.Right, Lying Direction.Left ) ->
-            Player (FallingUnbalanced Direction.Right 0) ( x, y + 1 )
+                ( Just Direction.Left, Lying Direction.Right ) ->
+                    Cuboid (FallingUnbalanced Direction.Left 0) ( x, y + 1 )
 
-        ( Just Direction.Right, Lying Direction.Right ) ->
-            Player (FallingUnbalanced Direction.Right 0) ( x, y )
+                ( Just Direction.Right, Lying Direction.Left ) ->
+                    Cuboid (FallingUnbalanced Direction.Right 0) ( x, y + 1 )
 
-        ( Just Direction.Up, Lying Direction.Up ) ->
-            Player (FallingUnbalanced Direction.Up 0) ( x, y )
+                ( Just Direction.Right, Lying Direction.Right ) ->
+                    Cuboid (FallingUnbalanced Direction.Right 0) ( x, y )
 
-        ( Just Direction.Up, Lying Direction.Down ) ->
-            Player (FallingUnbalanced Direction.Up 0) ( x + 1, y )
+                ( Just Direction.Up, Lying Direction.Up ) ->
+                    Cuboid (FallingUnbalanced Direction.Up 0) ( x, y )
 
-        ( Just Direction.Down, Lying Direction.Up ) ->
-            Player (FallingUnbalanced Direction.Down 0) ( x - 1, y )
+                ( Just Direction.Up, Lying Direction.Down ) ->
+                    Cuboid (FallingUnbalanced Direction.Up 0) ( x + 1, y )
 
-        ( Just Direction.Down, Lying Direction.Down ) ->
-            Player (FallingUnbalanced Direction.Down 0) ( x, y )
+                ( Just Direction.Down, Lying Direction.Up ) ->
+                    Cuboid (FallingUnbalanced Direction.Down 0) ( x - 1, y )
 
-        ( Nothing, Lying direction ) ->
-            Player (FallingInHorizontalOrientation direction 0) ( x, y )
+                ( Just Direction.Down, Lying Direction.Down ) ->
+                    Cuboid (FallingUnbalanced Direction.Down 0) ( x, y )
 
-        _ ->
-            Player state ( x, y )
+                ( Nothing, Lying direction ) ->
+                    Cuboid (FallingInHorizontalOrientation direction 0) ( x, y )
+
+                _ ->
+                    Cuboid state ( x, y )
 
 
 occupiedPositions : Player -> List ( Int, Int )
 occupiedPositions player =
     case player of
-        Player Standing ( x, y ) ->
+        Cuboid Standing ( x, y ) ->
             [ ( x, y ) ]
 
-        Player (Lying Direction.Left) ( x, y ) ->
+        Cuboid (Lying Direction.Left) ( x, y ) ->
             [ ( x, y - 1 ), ( x, y ) ]
 
-        Player (Lying Direction.Up) ( x, y ) ->
+        Cuboid (Lying Direction.Up) ( x, y ) ->
             [ ( x - 1, y ), ( x, y ) ]
 
-        Player (Lying Direction.Right) ( x, y ) ->
+        Cuboid (Lying Direction.Right) ( x, y ) ->
             [ ( x, y ), ( x, y + 1 ) ]
 
-        Player (Lying Direction.Down) ( x, y ) ->
+        Cuboid (Lying Direction.Down) ( x, y ) ->
             [ ( x, y ), ( x + 1, y ) ]
+
+        Cubes ( cube1, cube2 ) ->
+            [ cube1, cube2 ]
+                |> List.filterMap
+                    (\cube ->
+                        case cube of
+                            Cube Stable ( x, y ) ->
+                                Just ( x, y )
+
+                            _ ->
+                                Nothing
+                    )
 
         _ ->
             []
@@ -551,88 +755,151 @@ unstablePosition player level =
 
 
 interact : Level -> Player -> ( Player, InteractionMsg )
-interact level ((Player state ( x, y )) as player) =
-    case ( occupiedTiles player level, state ) of
-        -- Falling off the stage
-        ( [ Level.Empty ], _ ) ->
-            ( fall Nothing player, EmitSound "fall" )
+interact level player =
+    let
+        playerOccupiedTiles =
+            occupiedTiles player level
+    in
+    case player of
+        Cubes ( Cube selectedCubeState ( x1, y1 ), Cube _ ( x2, y2 ) ) ->
+            let
+                dX =
+                    abs (x1 - x2)
 
-        ( [ Level.Empty, Level.Empty ], _ ) ->
-            ( fall Nothing player, EmitSound "fall" )
+                dY =
+                    abs (y1 - y2)
+            in
+            if List.any ((==) Level.Empty) playerOccupiedTiles then
+                -- Cube fall
+                ( fall Nothing player, EmitSound "fall" )
 
-        ( [ Level.Empty, _ ], Lying Direction.Left ) ->
-            ( fall (Just Direction.Left) player, EmitSound "fall" )
+            else if dX == 1 && dY == 0 then
+                -- Merge cubes into cuboid (lying up or down)
+                ( Cuboid (Lying Direction.Down) ( min x1 x2, y1 ), EmitSound "bridge-open" )
 
-        ( [ Level.Empty, _ ], Lying Direction.Right ) ->
-            ( fall (Just Direction.Left) player, EmitSound "fall" )
-
-        ( [ Level.Empty, _ ], Lying Direction.Up ) ->
-            ( fall (Just Direction.Up) player, EmitSound "fall" )
-
-        ( [ Level.Empty, _ ], Lying Direction.Down ) ->
-            ( fall (Just Direction.Up) player, EmitSound "fall" )
-
-        ( [ _, Level.Empty ], Lying Direction.Left ) ->
-            ( fall (Just Direction.Right) player, EmitSound "fall" )
-
-        ( [ _, Level.Empty ], Lying Direction.Right ) ->
-            ( fall (Just Direction.Right) player, EmitSound "fall" )
-
-        ( [ _, Level.Empty ], Lying Direction.Up ) ->
-            ( fall (Just Direction.Down) player, EmitSound "fall" )
-
-        ( [ _, Level.Empty ], Lying Direction.Down ) ->
-            ( fall (Just Direction.Down) player, EmitSound "fall" )
-
-        -- Stomp on rusty tile
-        ( [ Level.RustyFloor ], Standing ) ->
-            ( Player (FallingWithTheFloor 0) ( x, y ), EmitSound "break-tile" )
-
-        ( [], FallingWithTheFloor progress ) ->
-            if progress >= 30 then
-                ( init (Level.getStartingPosition level), RestartedLevel )
+            else if dX == 0 && dY == 1 then
+                -- Merge cubes into cuboid (lying right or left)
+                ( Cuboid (Lying Direction.Right) ( x1, min y1 y2 ), EmitSound "bridge-open" )
 
             else
-                ( player, PushDownTile (Length.centimeters progress) )
+                case selectedCubeState of
+                    Falling progress ->
+                        if progress >= 30 then
+                            ( init (Level.getStartingPosition level), RestartedLevel )
 
-        -- Success
-        ( [ Level.Finish ], _ ) ->
-            ( Player (SlideIn 0) ( x, y ), EmitSound "slide-in" )
+                        else
+                            ( player, InternalUpdate )
 
-        ( [], SlideIn progress ) ->
-            ( player
-            , if progress >= 1 then
-                FinishedLevel
+                    _ ->
+                        ( player, InternalUpdate )
 
-              else
-                InternalUpdate
-            )
+        Cuboid state ( x, y ) ->
+            case ( playerOccupiedTiles, state ) of
+                -- Falling off the stage
+                ( [ Level.Empty ], _ ) ->
+                    ( fall Nothing player, EmitSound "fall" )
 
-        -- Restart
-        ( [], FallingInHorizontalOrientation _ progress ) ->
-            if progress >= 30 then
-                ( init (Level.getStartingPosition level), RestartedLevel )
+                ( [ Level.Empty, Level.Empty ], _ ) ->
+                    ( fall Nothing player, EmitSound "fall" )
 
-            else
-                ( player, InternalUpdate )
+                ( [ Level.Empty, _ ], Lying Direction.Left ) ->
+                    ( fall (Just Direction.Left) player, EmitSound "fall" )
 
-        ( [], FallingInVerticalOrientation { progress } ) ->
-            if progress >= 30 then
-                ( init (Level.getStartingPosition level), RestartedLevel )
+                ( [ Level.Empty, _ ], Lying Direction.Right ) ->
+                    ( fall (Just Direction.Left) player, EmitSound "fall" )
 
-            else
-                ( player, InternalUpdate )
+                ( [ Level.Empty, _ ], Lying Direction.Up ) ->
+                    ( fall (Just Direction.Up) player, EmitSound "fall" )
 
-        -- Trigger activation
-        ( [ Level.Trigger _ actions, _ ], Lying _ ) ->
-            ( player, TriggerActions actions )
+                ( [ Level.Empty, _ ], Lying Direction.Down ) ->
+                    ( fall (Just Direction.Up) player, EmitSound "fall" )
 
-        ( [ _, Level.Trigger _ actions ], Lying _ ) ->
-            ( player, TriggerActions actions )
+                ( [ _, Level.Empty ], Lying Direction.Left ) ->
+                    ( fall (Just Direction.Right) player, EmitSound "fall" )
 
-        ( [ Level.Trigger _ actions ], Standing ) ->
-            ( player, TriggerActions actions )
+                ( [ _, Level.Empty ], Lying Direction.Right ) ->
+                    ( fall (Just Direction.Right) player, EmitSound "fall" )
 
-        -- Nothing to be done
+                ( [ _, Level.Empty ], Lying Direction.Up ) ->
+                    ( fall (Just Direction.Down) player, EmitSound "fall" )
+
+                ( [ _, Level.Empty ], Lying Direction.Down ) ->
+                    ( fall (Just Direction.Down) player, EmitSound "fall" )
+
+                -- Stomp on rusty tile
+                ( [ Level.RustyFloor ], Standing ) ->
+                    ( Cuboid (FallingWithTheFloor 0) ( x, y ), EmitSound "break-tile" )
+
+                ( [], FallingWithTheFloor progress ) ->
+                    if progress >= 30 then
+                        ( init (Level.getStartingPosition level), RestartedLevel )
+
+                    else
+                        ( player, PushDownTile (Length.centimeters progress) )
+
+                -- Success
+                ( [ Level.Finish ], _ ) ->
+                    ( Cuboid (SlideIn 0) ( x, y ), EmitSound "slide-in" )
+
+                ( [], SlideIn progress ) ->
+                    ( player
+                    , if progress >= 1 then
+                        FinishedLevel
+
+                      else
+                        InternalUpdate
+                    )
+
+                -- Restart
+                ( [], FallingInHorizontalOrientation _ progress ) ->
+                    if progress >= 30 then
+                        ( init (Level.getStartingPosition level), RestartedLevel )
+
+                    else
+                        ( player, InternalUpdate )
+
+                ( [], FallingInVerticalOrientation { progress } ) ->
+                    if progress >= 30 then
+                        ( init (Level.getStartingPosition level), RestartedLevel )
+
+                    else
+                        ( player, InternalUpdate )
+
+                -- Trigger activation
+                ( [ Level.Trigger _ actions, _ ], Lying _ ) ->
+                    ( handlePlayerActions actions player, TriggerActions actions )
+
+                ( [ _, Level.Trigger _ actions ], Lying _ ) ->
+                    ( handlePlayerActions actions player, TriggerActions actions )
+
+                ( [ Level.Trigger _ actions ], Standing ) ->
+                    ( handlePlayerActions actions player, TriggerActions actions )
+
+                -- Nothing to be done
+                _ ->
+                    ( player, InternalUpdate )
+
+
+handlePlayerActions : List Level.TriggerAction -> Player -> Player
+handlePlayerActions actions player =
+    List.foldl
+        (\action playerAcc ->
+            case action of
+                Level.SplitToCubes position1 position2 ->
+                    initCubes position1 position2
+
+                _ ->
+                    player
+        )
+        player
+        actions
+
+
+isSplit : Player -> Bool
+isSplit player =
+    case player of
+        Cubes _ ->
+            True
+
         _ ->
-            ( player, InternalUpdate )
+            False
