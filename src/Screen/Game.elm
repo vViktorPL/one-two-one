@@ -29,6 +29,7 @@ type Game
         { player : Player
         , level : Level
         , levelsLeft : List Level
+        , currentLevelNumber : Int
         , control : Maybe Direction
         , mobile : Bool
         }
@@ -65,6 +66,7 @@ init mobile levelStartIndex =
         { player = Player.init (Level.getStartingPosition level)
         , level = level
         , levelsLeft = levelsLeft
+        , currentLevelNumber = levelStartIndex + 1
         , control = Nothing
         , mobile = mobile
         }
@@ -109,6 +111,7 @@ update msg (Game game) =
                                 { player = Player.init (Level.getStartingPosition nextLevel)
                                 , level = nextLevel
                                 , levelsLeft = rest
+                                , currentLevelNumber = game.currentLevelNumber + 1
                                 , control = Nothing
                                 , mobile = game.mobile
                                 }
@@ -195,7 +198,7 @@ update msg (Game game) =
 
 
 view : ( Int, Int ) -> Game -> Html Msg
-view ( width, height ) (Game { player, level, mobile }) =
+view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
     let
         zoomOut =
             max (800 / toFloat width) 1
@@ -232,7 +235,7 @@ view ( width, height ) (Game { player, level, mobile }) =
                     "Press spacebar to select another cube"
 
                  else
-                    ""
+                    "Level " ++ String.fromInt currentLevelNumber
                 )
             ]
         , Scene3d.sunny
