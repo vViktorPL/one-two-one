@@ -30,6 +30,8 @@ type Game
         , level : Level
         , levelsLeft : List Level
         , currentLevelNumber : Int
+        , totalMoves : Int
+        , totalFails : Int
         , control : Maybe Direction
         , mobile : Bool
         }
@@ -44,7 +46,7 @@ type Msg
 type MsgOut
     = NoOp
     | SaveGame Int
-    | GameFinished
+    | GameFinished { totalMoves : Int, totalFails : Int }
 
 
 init : Bool -> Int -> Game
@@ -67,6 +69,8 @@ init mobile levelStartIndex =
         , level = level
         , levelsLeft = levelsLeft
         , currentLevelNumber = levelStartIndex + 1
+        , totalMoves = 0
+        , totalFails = 0
         , control = Nothing
         , mobile = mobile
         }
@@ -87,9 +91,18 @@ update msg (Game game) =
     case msg of
         Tick delta ->
             let
+                controlledPlayer =
+                    controlPlayer game.control game.player
+
+                totalMoves =
+                    if controlledPlayer == game.player then
+                        game.totalMoves
+
+                    else
+                        game.totalMoves + 1
+
                 ( animatedPlayer, playerCmd ) =
-                    game.player
-                        |> controlPlayer game.control
+                    controlledPlayer
                         |> Player.update delta game.level
 
                 ( updatedPlayer, interactionMsg ) =
@@ -102,18 +115,19 @@ update msg (Game game) =
             in
             case interactionMsg of
                 Player.InternalUpdate ->
-                    ( Game { game | player = updatedPlayer, level = updatedLevel }, playerCmd, NoOp )
+                    ( Game { game | player = updatedPlayer, level = updatedLevel, totalMoves = totalMoves }, playerCmd, NoOp )
 
                 Player.FinishedLevel ->
                     case game.levelsLeft of
                         nextLevel :: rest ->
                             ( Game
-                                { player = Player.init (Level.getStartingPosition nextLevel)
-                                , level = nextLevel
-                                , levelsLeft = rest
-                                , currentLevelNumber = game.currentLevelNumber + 1
-                                , control = Nothing
-                                , mobile = game.mobile
+                                { game
+                                    | player = Player.init (Level.getStartingPosition nextLevel)
+                                    , level = nextLevel
+                                    , levelsLeft = rest
+                                    , currentLevelNumber = game.currentLevelNumber + 1
+                                    , control = Nothing
+                                    , mobile = game.mobile
                                 }
                             , playerCmd
                             , SaveGame (List.length LevelIndex.restLevels - List.length rest)
@@ -165,6 +179,7 @@ update msg (Game game) =
                         { game
                             | player = updatedPlayer
                             , level = Level.restart game.level
+                            , totalFails = game.totalFails + 1
                         }
                     , playerCmd
                     , NoOp
@@ -198,7 +213,7 @@ update msg (Game game) =
 
 
 view : ( Int, Int ) -> Game -> Html Msg
-view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
+view ( width, height ) (Game { player, level, mobile, currentLevelNumber, totalMoves, totalFails }) =
     let
         zoomOut =
             max (800 / toFloat width) 1
@@ -219,6 +234,14 @@ view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
                         }
                 , verticalFieldOfView = Angle.degrees 30
                 }
+
+        statsString =
+            "LVL_"
+                ++ String.fromInt currentLevelNumber
+                ++ " MOV_"
+                ++ String.fromInt totalMoves
+                ++ " ERR_"
+                ++ String.fromInt totalFails
     in
     Html.div []
         [ Html.div
@@ -229,13 +252,14 @@ view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
             , style "color" "black"
             , style "font-size" "25px"
             , style "text-align" "center"
+            , style "white-space" "pre"
             ]
             [ Html.text
                 (if not mobile && Player.isSplit player then
-                    "Press spacebar to select another cube"
+                    statsString ++ "\nPress spacebar to select another cube"
 
                  else
-                    "Level " ++ String.fromInt currentLevelNumber
+                    statsString
                 )
             ]
         , Scene3d.sunny
