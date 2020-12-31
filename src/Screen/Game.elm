@@ -204,7 +204,12 @@ view ( width, height ) (Game { player, level, mobile }) =
             Camera3d.perspective
                 { viewpoint =
                     Viewpoint3d.orbitZ
-                        { focalPoint = Point3d.centimeters 5 5 0
+                        { focalPoint =
+                            if Level.isBigLevel level then
+                                Player.centerPosition player
+
+                            else
+                                Point3d.centimeters 5 5 0
                         , azimuth = Angle.degrees 25
                         , elevation = Angle.degrees 45
                         , distance = Length.centimeters (25 * zoomOut)

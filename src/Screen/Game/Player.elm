@@ -1,13 +1,13 @@
-module Screen.Game.Player exposing (InteractionMsg(..), Player, fall, getPosition, init, interact, isSplit, move, toggleSelectedCube, update, view)
+module Screen.Game.Player exposing (InteractionMsg(..), Player, centerPosition, fall, getPosition, init, interact, isSplit, move, toggleSelectedCube, update, view)
 
 import Angle
 import Axis3d
-import Block3d
+import Block3d exposing (Block3d)
 import Color
 import Cone3d
 import Direction3d
 import Length exposing (Length)
-import Point3d
+import Point3d exposing (Point3d)
 import Scene3d
 import Scene3d.Material as Material
 import Screen.Game.Constant as Constant
@@ -274,8 +274,8 @@ cubeFallInteraction delta cube =
             cube
 
 
-view : Player -> Scene3d.Entity coordinates
-view player =
+getBlocks : Player -> List (Block3d Length.Meters coordinates)
+getBlocks player =
     case player of
         Cuboid orientation ( x, y ) ->
             let
@@ -286,17 +286,14 @@ view player =
                     toFloat y * Constant.tileSizeCm
 
                 block =
-                    Scene3d.block
-                        (Material.metal { baseColor = Color.orange, roughness = 2.5 })
-                        (Block3d.with
-                            { x1 = Length.centimeters 0
-                            , x2 = Length.centimeters Constant.playerWidthCm
-                            , y1 = Length.centimeters 0
-                            , y2 = Length.centimeters Constant.playerWidthCm
-                            , z1 = Length.centimeters 0
-                            , z2 = Length.centimeters Constant.playerHeightCm
-                            }
-                        )
+                    Block3d.with
+                        { x1 = Length.centimeters 0
+                        , x2 = Length.centimeters Constant.playerWidthCm
+                        , y1 = Length.centimeters 0
+                        , y2 = Length.centimeters Constant.playerWidthCm
+                        , z1 = Length.centimeters 0
+                        , z2 = Length.centimeters Constant.playerHeightCm
+                        }
             in
             (case orientation of
                 -- +
@@ -307,167 +304,179 @@ view player =
                 -- 0
                 Lying Direction.Up ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
+                        |> Block3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.x Constant.tileSize
 
                 -- 0-
                 Lying Direction.Right ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Block3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeY Constant.tileSize
 
                 -- 0
                 -- |
                 Lying Direction.Down ->
                     block
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeX Constant.tileSize
 
                 -- -0
                 Lying Direction.Left ->
                     block
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
+                        |> Block3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.y Constant.tileSize
 
                 KnockingOver Direction.Up progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround topAxis (Angle.degrees (progress * 90))
 
                 KnockingOver Direction.Right progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround rightAxis (Angle.degrees (progress * 90))
 
                 KnockingOver Direction.Down progress ->
                     block
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
 
                 KnockingOver Direction.Left progress ->
                     block
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround leftAxis (Angle.degrees (progress * 90))
 
                 GettingUp Direction.Up progress ->
                     block
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees ((1 - progress) * 90))
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees ((1 - progress) * 90))
 
                 GettingUp Direction.Right progress ->
                     block
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees ((1 - progress) * 90))
+                        |> Block3d.rotateAround leftAxis (Angle.degrees ((1 - progress) * 90))
 
                 GettingUp Direction.Down progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees ((1 - progress) * 90))
+                        |> Block3d.rotateAround topAxis (Angle.degrees ((1 - progress) * 90))
 
                 GettingUp Direction.Left progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees ((1 - progress) * 90))
+                        |> Block3d.rotateAround rightAxis (Angle.degrees ((1 - progress) * 90))
 
                 Rolling Direction.Left progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.x Constant.tileSize
+                        |> Block3d.rotateAround leftAxis (Angle.degrees (progress * 90))
 
                 Rolling Direction.Right progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.x Constant.tileSize
+                        |> Block3d.rotateAround rightAxis (Angle.degrees (progress * 90))
 
                 Rolling Direction.Up progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                        |> Scene3d.rotateAround topAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Block3d.rotateAround topAxis (Angle.degrees (progress * 90))
 
                 Rolling Direction.Down progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
+                        |> Block3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees (progress * 90))
 
                 SlideIn progress ->
-                    Scene3d.block
-                        (Material.metal { baseColor = Color.orange, roughness = 2.5 })
-                        (Block3d.with
-                            { x1 = Length.centimeters 0
-                            , x2 = Length.centimeters Constant.playerWidthCm
-                            , y1 = Length.centimeters 0
-                            , y2 = Length.centimeters Constant.playerWidthCm
-                            , z1 = Length.centimeters 0
-                            , z2 = Length.centimeters (Constant.playerHeightCm - (progress * progress * 2))
-                            }
-                        )
+                    Block3d.with
+                        { x1 = Length.centimeters 0
+                        , x2 = Length.centimeters Constant.playerWidthCm
+                        , y1 = Length.centimeters 0
+                        , y2 = Length.centimeters Constant.playerWidthCm
+                        , z1 = Length.centimeters 0
+                        , z2 = Length.centimeters (Constant.playerHeightCm - (progress * progress * 2))
+                        }
 
                 FallingUnbalanced Direction.Left progress ->
                     block
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
+                        |> Block3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.y Constant.tileSize
+                        |> Block3d.rotateAround leftAxis (Angle.degrees (90 * progress))
 
                 FallingUnbalanced Direction.Right progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
+                        |> Block3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Block3d.rotateAround rightAxis (Angle.degrees (90 * progress))
 
                 FallingUnbalanced Direction.Up progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                        |> Scene3d.rotateAround topAxis (Angle.degrees (90 * progress))
+                        |> Block3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.x Constant.tileSize
+                        |> Block3d.rotateAround topAxis (Angle.degrees (90 * progress))
 
                 FallingUnbalanced Direction.Down progress ->
                     block
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeX Constant.tileSize
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
 
                 FallingInVerticalOrientation { zOffset, progress } ->
                     block
-                        |> Scene3d.translateIn Direction3d.negativeZ zOffset
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.translateIn Direction3d.negativeZ zOffset
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
 
                 FallingInHorizontalOrientation Direction.Left progress ->
                     block
-                        |> Scene3d.rotateAround leftAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.y Constant.tileSize
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.rotateAround leftAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.y Constant.tileSize
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
 
                 FallingInHorizontalOrientation Direction.Up progress ->
                     block
-                        |> Scene3d.rotateAround topAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.x Constant.tileSize
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.rotateAround topAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.x Constant.tileSize
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
 
                 FallingInHorizontalOrientation Direction.Right progress ->
                     block
-                        |> Scene3d.rotateAround rightAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeY Constant.tileSize
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.rotateAround rightAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeY Constant.tileSize
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
 
                 FallingInHorizontalOrientation Direction.Down progress ->
                     block
-                        |> Scene3d.rotateAround bottomAxis (Angle.degrees 90)
-                        |> Scene3d.translateIn Direction3d.negativeX Constant.tileSize
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.rotateAround bottomAxis (Angle.degrees 90)
+                        |> Block3d.translateIn Direction3d.negativeX Constant.tileSize
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
 
                 FallingFromTheSky progress ->
                     block
-                        |> Scene3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
+                        |> Block3d.translateIn Direction3d.z (Length.centimeters ((1 - progress) * 10))
 
                 FallingWithTheFloor progress ->
                     block
-                        |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                        |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
             )
-                |> Scene3d.translateBy
+                |> Block3d.translateBy
                     (Vector3d.centimeters positionX positionY 0)
+                |> List.singleton
 
         Cubes ( cube1, cube2 ) ->
-            Scene3d.group
-                [ viewCube cube1
-                , viewCube cube2
-                , viewSelectedCubeMarker cube1
-                ]
+            [ cubeToBlock cube1
+            , cubeToBlock cube2
+            ]
+
+
+view : Player -> Scene3d.Entity coordinates
+view player =
+    let
+        blocks =
+            List.map
+                (Scene3d.block (Material.metal { baseColor = Color.orange, roughness = 2.5 }))
+                (getBlocks player)
+    in
+    case player of
+        Cuboid _ _ ->
+            Scene3d.group blocks
+
+        Cubes ( selectedCube, _ ) ->
+            Scene3d.group (viewSelectedCubeMarker selectedCube :: blocks)
 
 
 viewSelectedCubeMarker : Cube -> Scene3d.Entity coordinates
@@ -508,8 +517,8 @@ viewSelectedCubeMarker (Cube state ( x, y )) =
             (Vector3d.centimeters positionX positionY 0)
 
 
-viewCube : Cube -> Scene3d.Entity coordinates
-viewCube (Cube state ( x, y )) =
+cubeToBlock : Cube -> Block3d Length.Meters coordinates
+cubeToBlock (Cube state ( x, y )) =
     let
         positionX =
             toFloat x * Constant.tileSizeCm
@@ -518,17 +527,14 @@ viewCube (Cube state ( x, y )) =
             toFloat y * Constant.tileSizeCm
 
         cube =
-            Scene3d.block
-                (Material.metal { baseColor = Color.orange, roughness = 2.5 })
-                (Block3d.with
-                    { x1 = Length.centimeters 0
-                    , x2 = Length.centimeters Constant.playerWidthCm
-                    , y1 = Length.centimeters 0
-                    , y2 = Length.centimeters Constant.playerWidthCm
-                    , z1 = Length.centimeters 0
-                    , z2 = Length.centimeters Constant.playerWidthCm
-                    }
-                )
+            Block3d.with
+                { x1 = Length.centimeters 0
+                , x2 = Length.centimeters Constant.playerWidthCm
+                , y1 = Length.centimeters 0
+                , y2 = Length.centimeters Constant.playerWidthCm
+                , z1 = Length.centimeters 0
+                , z2 = Length.centimeters Constant.playerWidthCm
+                }
     in
     (case state of
         Stable ->
@@ -536,25 +542,25 @@ viewCube (Cube state ( x, y )) =
 
         Rotating Direction.Up progress ->
             cube
-                |> Scene3d.rotateAround topAxis (Angle.degrees (90 * progress))
+                |> Block3d.rotateAround topAxis (Angle.degrees (90 * progress))
 
         Rotating Direction.Down progress ->
             cube
-                |> Scene3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
+                |> Block3d.rotateAround bottomAxis (Angle.degrees (90 * progress))
 
         Rotating Direction.Right progress ->
             cube
-                |> Scene3d.rotateAround rightAxis (Angle.degrees (90 * progress))
+                |> Block3d.rotateAround rightAxis (Angle.degrees (90 * progress))
 
         Rotating Direction.Left progress ->
             cube
-                |> Scene3d.rotateAround leftAxis (Angle.degrees (90 * progress))
+                |> Block3d.rotateAround leftAxis (Angle.degrees (90 * progress))
 
         Falling progress ->
             cube
-                |> Scene3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
+                |> Block3d.translateIn Direction3d.negativeZ (Length.centimeters progress)
     )
-        |> Scene3d.translateBy
+        |> Block3d.translateBy
             (Vector3d.centimeters positionX positionY 0)
 
 
@@ -903,3 +909,16 @@ isSplit player =
 
         _ ->
             False
+
+
+centerPosition : Player -> Point3d Length.Meters coordinates
+centerPosition player =
+    case getBlocks player of
+        [ block ] ->
+            Block3d.centerPoint block
+
+        [ selectedCube, _ ] ->
+            Block3d.centerPoint selectedCube
+
+        _ ->
+            Point3d.origin

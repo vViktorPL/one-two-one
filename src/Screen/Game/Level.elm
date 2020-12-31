@@ -1,4 +1,4 @@
-module Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), fromData, getStartingPosition, getTileAt, restart, shiftTile, triggerActions, update, view)
+module Screen.Game.Level exposing (Level, LevelTile(..), TriggerAction(..), fromData, getStartingPosition, getTileAt, isBigLevel, restart, shiftTile, triggerActions, update, view)
 
 import Angle exposing (Angle)
 import Array exposing (Array)
@@ -46,11 +46,19 @@ type Level
         { tiles : Array (Array LevelTile)
         , tileStates : Dict ( Int, Int ) TileState
         , startingPosition : ( Int, Int )
+        , big : Bool
         }
 
 
 fromData : List (List LevelTile) -> ( Int, Int ) -> Level
 fromData tiles startingPosition =
+    let
+        width =
+            List.map List.length tiles |> List.foldl max 0
+
+        height =
+            List.length tiles
+    in
     Level
         { tiles =
             tiles
@@ -58,6 +66,7 @@ fromData tiles startingPosition =
                 |> Array.fromList
         , tileStates = Dict.empty
         , startingPosition = startingPosition
+        , big = width >= 15 || height >= 15
         }
 
 
@@ -332,3 +341,8 @@ triggerEntity color ( x, y ) =
                 }
             )
         ]
+
+
+isBigLevel : Level -> Bool
+isBigLevel (Level { big }) =
+    big
