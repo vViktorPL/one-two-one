@@ -6,6 +6,7 @@ import Browser.Events
 import Html exposing (Html)
 import Json.Decode
 import Json.Encode
+import Screen.Cheats
 import Screen.Congratulations exposing (Congratulations)
 import Screen.Game exposing (Game)
 import Screen.Menu exposing (Menu)
@@ -30,12 +31,14 @@ type Screen
     = MenuScreen Menu
     | GameScreen Game
     | CongratulationsScreen Congratulations
+    | CheatsScreen
 
 
 type Msg
     = GameMsg Screen.Game.Msg
     | ViewportSize ( Int, Int )
-    | MenuAction Screen.Menu.MsgOut
+    | MenuMsg Screen.Menu.Msg
+    | CheatsMsg Screen.Cheats.Msg
 
 
 port saveGame : Int -> Cmd msg
@@ -72,19 +75,44 @@ update msg model =
                 ( _, _, Screen.Game.GameFinished ) ->
                     ( { model | screen = CongratulationsScreen Screen.Congratulations.init, lastLevel = 0 }, saveGame 0 )
 
-        ( MenuScreen _, MenuAction Screen.Menu.StartGame ) ->
-            ( { model
-                | screen = GameScreen (Screen.Game.init model.mobile 0)
-                , lastLevel = 0
-              }
-            , saveGame 0
-            )
+        ( MenuScreen menu, MenuMsg menuMsg ) ->
+            let
+                ( updatedMenu, menuAction ) =
+                    Screen.Menu.update menuMsg menu
+            in
+            case menuAction of
+                Just Screen.Menu.StartGame ->
+                    ( { model
+                        | screen = GameScreen (Screen.Game.init model.mobile 0)
+                        , lastLevel = 0
+                      }
+                    , saveGame 0
+                    )
 
-        ( MenuScreen _, MenuAction Screen.Menu.ContinueGame ) ->
-            ( { model
-                | screen = GameScreen (Screen.Game.init model.mobile model.lastLevel)
-              }
-            , Cmd.none
+                Just Screen.Menu.ContinueGame ->
+                    ( { model
+                        | screen = GameScreen (Screen.Game.init model.mobile model.lastLevel)
+                      }
+                    , Cmd.none
+                    )
+
+                Just Screen.Menu.ActivateCheats ->
+                    ( { model
+                        | screen = CheatsScreen
+                      }
+                    , Cmd.none
+                    )
+
+                Nothing ->
+                    ( { model
+                        | screen = MenuScreen updatedMenu
+                      }
+                    , Cmd.none
+                    )
+
+        ( CheatsScreen, CheatsMsg (Screen.Cheats.SetLevel levelNumber) ) ->
+            ( { model | screen = GameScreen (Screen.Game.init model.mobile (levelNumber - 1)) }
+            , saveGame (levelNumber - 1)
             )
 
         ( _, ViewportSize dimensions ) ->
@@ -126,4 +154,7 @@ view { screen, screenDimensions } =
             Screen.Congratulations.view congratulations
 
         MenuScreen menu ->
-            Html.map MenuAction (Screen.Menu.view menu)
+            Html.map MenuMsg (Screen.Menu.view menu)
+
+        CheatsScreen ->
+            Html.map CheatsMsg Screen.Cheats.view
