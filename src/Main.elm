@@ -67,13 +67,19 @@ update msg model =
         ( GameScreen game, GameMsg gameMsg ) ->
             case Screen.Game.update gameMsg game of
                 ( updatedGame, cmd, Screen.Game.NoOp ) ->
-                    ( { model | screen = GameScreen updatedGame }, cmd )
+                    ( { model | screen = GameScreen updatedGame }
+                    , Cmd.map GameMsg cmd
+                    )
 
-                ( updatedGame, _, Screen.Game.SaveGame levelIndex ) ->
-                    ( { model | screen = GameScreen updatedGame, lastLevel = levelIndex }, saveGame levelIndex )
+                ( updatedGame, cmd, Screen.Game.SaveGame levelIndex ) ->
+                    ( { model | screen = GameScreen updatedGame, lastLevel = levelIndex }
+                    , Cmd.batch [ Cmd.map GameMsg cmd, saveGame levelIndex ]
+                    )
 
-                ( _, _, Screen.Game.GameFinished ) ->
-                    ( { model | screen = CongratulationsScreen Screen.Congratulations.init, lastLevel = 0 }, saveGame 0 )
+                ( _, _, Screen.Game.GameFinished stats ) ->
+                    ( { model | screen = CongratulationsScreen Screen.Congratulations.init, lastLevel = 0 }
+                    , saveGame 0
+                    )
 
         ( MenuScreen menu, MenuMsg menuMsg ) ->
             let
@@ -82,18 +88,24 @@ update msg model =
             in
             case menuAction of
                 Just Screen.Menu.StartGame ->
+                    let
+                        ( game, gameCmd ) =
+                            Screen.Game.init model.mobile 0
+                    in
                     ( { model
-                        | screen = GameScreen (Screen.Game.init model.mobile 0)
+                        | screen = GameScreen game
                         , lastLevel = 0
                       }
-                    , saveGame 0
+                    , Cmd.batch [ saveGame 0, Cmd.map GameMsg gameCmd ]
                     )
 
                 Just Screen.Menu.ContinueGame ->
-                    ( { model
-                        | screen = GameScreen (Screen.Game.init model.mobile model.lastLevel)
-                      }
-                    , Cmd.none
+                    let
+                        ( game, gameCmd ) =
+                            Screen.Game.init model.mobile model.lastLevel
+                    in
+                    ( { model | screen = GameScreen game }
+                    , Cmd.map GameMsg gameCmd
                     )
 
                 Just Screen.Menu.ActivateCheats ->
@@ -111,8 +123,12 @@ update msg model =
                     )
 
         ( CheatsScreen, CheatsMsg (Screen.Cheats.SetLevel levelNumber) ) ->
-            ( { model | screen = GameScreen (Screen.Game.init model.mobile (levelNumber - 1)) }
-            , saveGame (levelNumber - 1)
+            let
+                ( game, gameCmd ) =
+                    Screen.Game.init model.mobile (levelNumber - 1)
+            in
+            ( { model | screen = GameScreen game }
+            , Cmd.batch [ saveGame (levelNumber - 1), Cmd.map GameMsg gameCmd ]
             )
 
         ( _, ViewportSize dimensions ) ->

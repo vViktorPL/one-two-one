@@ -20,6 +20,8 @@ import Screen.Game.Level as Level exposing (Level)
 import Screen.Game.Level.Index as LevelIndex
 import Screen.Game.Player as Player exposing (Player)
 import Sound
+import Task
+import Time
 import Vector3d
 import Viewpoint3d
 
@@ -32,24 +34,39 @@ type Game
         , currentLevelNumber : Int
         , totalMoves : Int
         , totalFails : Int
+        , accumulatedTime : Int
+        , currentLevelTimestamp : Maybe Int
+        , currentTimestamp : Int
         , control : Maybe Direction
         , mobile : Bool
         }
 
 
 type Msg
-    = Tick Float
+    = AnimationTick Float
     | KeyDown String
     | KeyUp String
+    | TimerTick Time.Posix
+    | StartLevelTimer Time.Posix
 
 
 type MsgOut
     = NoOp
     | SaveGame Int
-    | GameFinished { totalMoves : Int, totalFails : Int }
+    | GameFinished { totalMoves : Int, totalFails : Int, totalTime : Int }
 
 
-init : Bool -> Int -> Game
+getTimerSecs : Game -> Int
+getTimerSecs (Game { accumulatedTime, currentLevelTimestamp, currentTimestamp }) =
+    case currentLevelTimestamp of
+        Just startTimestamp ->
+            accumulatedTime + (currentTimestamp - startTimestamp)
+
+        Nothing ->
+            accumulatedTime
+
+
+init : Bool -> Int -> ( Game, Cmd Msg )
 init mobile levelStartIndex =
     let
         levels =
@@ -64,16 +81,21 @@ init mobile levelStartIndex =
                 _ ->
                     ( LevelIndex.firstLevel, LevelIndex.restLevels )
     in
-    Game
+    ( Game
         { player = Player.init (Level.getStartingPosition level)
         , level = level
         , levelsLeft = levelsLeft
         , currentLevelNumber = levelStartIndex + 1
         , totalMoves = 0
         , totalFails = 0
+        , accumulatedTime = 0
+        , currentLevelTimestamp = Nothing
+        , currentTimestamp = 0
         , control = Nothing
         , mobile = mobile
         }
+    , Task.perform StartLevelTimer Time.now
+    )
 
 
 controlPlayer : Maybe Direction -> Player -> Player
@@ -86,10 +108,20 @@ controlPlayer control player =
             player
 
 
-update : Msg -> Game -> ( Game, Cmd msg, MsgOut )
+update : Msg -> Game -> ( Game, Cmd Msg, MsgOut )
 update msg (Game game) =
     case msg of
-        Tick delta ->
+        TimerTick time ->
+            ( Game { game | currentTimestamp = Time.posixToMillis time // 1000 }, Cmd.none, NoOp )
+
+        StartLevelTimer time ->
+            let
+                timestamp =
+                    Time.posixToMillis time // 1000
+            in
+            ( Game { game | currentLevelTimestamp = Just timestamp, currentTimestamp = timestamp }, Cmd.none, NoOp )
+
+        AnimationTick delta ->
             let
                 controlledPlayer =
                     controlPlayer game.control game.player
@@ -126,15 +158,24 @@ update msg (Game game) =
                                     , level = nextLevel
                                     , levelsLeft = rest
                                     , currentLevelNumber = game.currentLevelNumber + 1
+                                    , accumulatedTime = getTimerSecs (Game game)
+                                    , currentLevelTimestamp = Nothing
                                     , control = Nothing
                                     , mobile = game.mobile
                                 }
-                            , playerCmd
+                            , Cmd.batch [ playerCmd, Task.perform StartLevelTimer Time.now ]
                             , SaveGame (List.length LevelIndex.restLevels - List.length rest)
                             )
 
                         [] ->
-                            ( Game game, playerCmd, GameFinished )
+                            ( Game
+                                { game
+                                    | accumulatedTime = getTimerSecs (Game game)
+                                    , currentLevelTimestamp = Nothing
+                                }
+                            , playerCmd
+                            , GameFinished { totalMoves = game.totalMoves, totalFails = game.totalFails, totalTime = getTimerSecs (Game game) }
+                            )
 
                 Player.PushDownTile zOffset ->
                     ( Game
@@ -213,7 +254,7 @@ update msg (Game game) =
 
 
 view : ( Int, Int ) -> Game -> Html Msg
-view ( width, height ) (Game { player, level, mobile, currentLevelNumber, totalMoves, totalFails }) =
+view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, totalMoves, totalFails }) as game) =
     let
         zoomOut =
             max (800 / toFloat width) 1
@@ -242,6 +283,8 @@ view ( width, height ) (Game { player, level, mobile, currentLevelNumber, totalM
                 ++ String.fromInt totalMoves
                 ++ " ERR_"
                 ++ String.fromInt totalFails
+                ++ " TIM_"
+                ++ String.fromInt (getTimerSecs game)
     in
     Html.div []
         [ Html.div
@@ -353,7 +396,8 @@ mobileControls player =
 subscriptions : Game -> Sub Msg
 subscriptions game =
     Sub.batch
-        [ Browser.Events.onAnimationFrameDelta Tick
+        [ Browser.Events.onAnimationFrameDelta AnimationTick
+        , Time.every 500 TimerTick
         , Browser.Events.onKeyDown (Decode.map KeyDown keyDecoder)
         , Browser.Events.onKeyUp (Decode.map KeyUp keyDecoder)
         ]
