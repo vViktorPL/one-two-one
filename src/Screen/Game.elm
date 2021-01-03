@@ -1,4 +1,4 @@
-module Screen.Game exposing (Game, Msg, MsgOut(..), init, subscriptions, update, view)
+module Screen.Game exposing (Game, Msg, MsgOut(..), Stats, init, initStats, subscriptions, update, view)
 
 import Angle
 import Axis3d
@@ -20,6 +20,8 @@ import Screen.Game.Level as Level exposing (Level)
 import Screen.Game.Level.Index as LevelIndex
 import Screen.Game.Player as Player exposing (Player)
 import Sound
+import Task
+import Time
 import Vector3d
 import Viewpoint3d
 
@@ -30,25 +32,62 @@ type Game
         , level : Level
         , levelsLeft : List Level
         , currentLevelNumber : Int
+        , stats : Stats
+        , currentLevelTimestamp : Maybe Int
+        , currentTimestamp : Int
         , control : Maybe Direction
         , mobile : Bool
         }
 
 
+type alias Stats =
+    { moves : Int
+    , fails : Int
+    , time : Int
+    , continues : Int
+    }
+
+
 type Msg
-    = Tick Float
+    = AnimationTick Float
     | KeyDown String
     | KeyUp String
+    | TimerTick Time.Posix
+    | StartLevelTimer Time.Posix
 
 
 type MsgOut
     = NoOp
-    | SaveGame Int
-    | GameFinished
+    | SaveGame Int Stats
+    | GameFinished Stats
 
 
-init : Bool -> Int -> Game
-init mobile levelStartIndex =
+getTimerSecs : Game -> Int
+getTimerSecs (Game { stats, currentLevelTimestamp, currentTimestamp }) =
+    case currentLevelTimestamp of
+        Just startTimestamp ->
+            stats.time + (currentTimestamp - startTimestamp)
+
+        Nothing ->
+            stats.time
+
+
+initStats : Stats
+initStats =
+    { moves = 0
+    , fails = 0
+    , time = 0
+    , continues = 0
+    }
+
+
+bumpFails : Stats -> Stats
+bumpFails stats =
+    { stats | fails = stats.fails + 1 }
+
+
+init : Bool -> Int -> Stats -> ( Game, Cmd Msg )
+init mobile levelStartIndex stats =
     let
         levels =
             (LevelIndex.firstLevel :: LevelIndex.restLevels)
@@ -62,14 +101,19 @@ init mobile levelStartIndex =
                 _ ->
                     ( LevelIndex.firstLevel, LevelIndex.restLevels )
     in
-    Game
+    ( Game
         { player = Player.init (Level.getStartingPosition level)
         , level = level
         , levelsLeft = levelsLeft
         , currentLevelNumber = levelStartIndex + 1
+        , stats = stats
+        , currentLevelTimestamp = Nothing
+        , currentTimestamp = 0
         , control = Nothing
         , mobile = mobile
         }
+    , Task.perform StartLevelTimer Time.now
+    )
 
 
 controlPlayer : Maybe Direction -> Player -> Player
@@ -82,14 +126,47 @@ controlPlayer control player =
             player
 
 
-update : Msg -> Game -> ( Game, Cmd msg, MsgOut )
+updateTimeStats : Game -> Stats
+updateTimeStats ((Game { stats }) as game) =
+    { stats | time = getTimerSecs game }
+
+
+update : Msg -> Game -> ( Game, Cmd Msg, MsgOut )
 update msg (Game game) =
     case msg of
-        Tick delta ->
+        TimerTick time ->
+            ( Game { game | currentTimestamp = Time.posixToMillis time // 1000 }
+            , Cmd.none
+            , NoOp
+            )
+
+        StartLevelTimer time ->
             let
+                timestamp =
+                    Time.posixToMillis time // 1000
+            in
+            ( Game { game | currentLevelTimestamp = Just timestamp, currentTimestamp = timestamp }
+            , Cmd.none
+            , NoOp
+            )
+
+        AnimationTick delta ->
+            let
+                controlledPlayer =
+                    controlPlayer game.control game.player
+
+                lastStats =
+                    game.stats
+
+                updatedStats =
+                    if controlledPlayer == game.player then
+                        lastStats
+
+                    else
+                        { lastStats | moves = lastStats.moves + 1 }
+
                 ( animatedPlayer, playerCmd ) =
-                    game.player
-                        |> controlPlayer game.control
+                    controlledPlayer
                         |> Player.update delta game.level
 
                 ( updatedPlayer, interactionMsg ) =
@@ -102,25 +179,35 @@ update msg (Game game) =
             in
             case interactionMsg of
                 Player.InternalUpdate ->
-                    ( Game { game | player = updatedPlayer, level = updatedLevel }, playerCmd, NoOp )
+                    ( Game { game | player = updatedPlayer, level = updatedLevel, stats = updatedStats }, playerCmd, NoOp )
 
                 Player.FinishedLevel ->
+                    let
+                        stats =
+                            updateTimeStats (Game game)
+                    in
                     case game.levelsLeft of
                         nextLevel :: rest ->
                             ( Game
-                                { player = Player.init (Level.getStartingPosition nextLevel)
-                                , level = nextLevel
-                                , levelsLeft = rest
-                                , currentLevelNumber = game.currentLevelNumber + 1
-                                , control = Nothing
-                                , mobile = game.mobile
+                                { game
+                                    | player = Player.init (Level.getStartingPosition nextLevel)
+                                    , level = nextLevel
+                                    , levelsLeft = rest
+                                    , currentLevelNumber = game.currentLevelNumber + 1
+                                    , currentLevelTimestamp = Nothing
+                                    , stats = stats
+                                    , control = Nothing
+                                    , mobile = game.mobile
                                 }
-                            , playerCmd
-                            , SaveGame (List.length LevelIndex.restLevels - List.length rest)
+                            , Cmd.batch [ playerCmd, Task.perform StartLevelTimer Time.now ]
+                            , SaveGame (game.currentLevelNumber + 1) stats
                             )
 
                         [] ->
-                            ( Game game, playerCmd, GameFinished )
+                            ( Game { game | currentLevelTimestamp = Nothing }
+                            , playerCmd
+                            , GameFinished stats
+                            )
 
                 Player.PushDownTile zOffset ->
                     ( Game
@@ -165,6 +252,7 @@ update msg (Game game) =
                         { game
                             | player = updatedPlayer
                             , level = Level.restart game.level
+                            , stats = bumpFails game.stats
                         }
                     , playerCmd
                     , NoOp
@@ -198,7 +286,7 @@ update msg (Game game) =
 
 
 view : ( Int, Int ) -> Game -> Html Msg
-view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
+view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, stats }) as game) =
     let
         zoomOut =
             max (800 / toFloat width) 1
@@ -219,6 +307,16 @@ view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
                         }
                 , verticalFieldOfView = Angle.degrees 30
                 }
+
+        statsString =
+            "LVL_"
+                ++ String.fromInt currentLevelNumber
+                ++ " MOV_"
+                ++ String.fromInt stats.moves
+                ++ " ERR_"
+                ++ String.fromInt stats.fails
+                ++ " TIM_"
+                ++ String.fromInt (getTimerSecs game)
     in
     Html.div []
         [ Html.div
@@ -229,13 +327,14 @@ view ( width, height ) (Game { player, level, mobile, currentLevelNumber }) =
             , style "color" "black"
             , style "font-size" "25px"
             , style "text-align" "center"
+            , style "white-space" "pre"
             ]
             [ Html.text
                 (if not mobile && Player.isSplit player then
-                    "Press spacebar to select another cube"
+                    statsString ++ "\nPress spacebar to select another cube"
 
                  else
-                    "Level " ++ String.fromInt currentLevelNumber
+                    statsString
                 )
             ]
         , Scene3d.sunny
@@ -329,7 +428,8 @@ mobileControls player =
 subscriptions : Game -> Sub Msg
 subscriptions game =
     Sub.batch
-        [ Browser.Events.onAnimationFrameDelta Tick
+        [ Browser.Events.onAnimationFrameDelta AnimationTick
+        , Time.every 500 TimerTick
         , Browser.Events.onKeyDown (Decode.map KeyDown keyDecoder)
         , Browser.Events.onKeyUp (Decode.map KeyUp keyDecoder)
         ]
