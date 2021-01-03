@@ -126,6 +126,11 @@ controlPlayer control player =
             player
 
 
+updateTimeStats : Game -> Stats
+updateTimeStats ((Game { stats }) as game) =
+    { stats | time = getTimerSecs game }
+
+
 update : Msg -> Game -> ( Game, Cmd Msg, MsgOut )
 update msg (Game game) =
     case msg of
@@ -177,6 +182,10 @@ update msg (Game game) =
                     ( Game { game | player = updatedPlayer, level = updatedLevel, stats = updatedStats }, playerCmd, NoOp )
 
                 Player.FinishedLevel ->
+                    let
+                        stats =
+                            updateTimeStats (Game game)
+                    in
                     case game.levelsLeft of
                         nextLevel :: rest ->
                             ( Game
@@ -186,17 +195,18 @@ update msg (Game game) =
                                     , levelsLeft = rest
                                     , currentLevelNumber = game.currentLevelNumber + 1
                                     , currentLevelTimestamp = Nothing
+                                    , stats = stats
                                     , control = Nothing
                                     , mobile = game.mobile
                                 }
                             , Cmd.batch [ playerCmd, Task.perform StartLevelTimer Time.now ]
-                            , SaveGame (game.currentLevelNumber + 1) game.stats
+                            , SaveGame (game.currentLevelNumber + 1) stats
                             )
 
                         [] ->
                             ( Game { game | currentLevelTimestamp = Nothing }
                             , playerCmd
-                            , GameFinished game.stats
+                            , GameFinished stats
                             )
 
                 Player.PushDownTile zOffset ->

@@ -107,11 +107,20 @@ update msg model =
 
                 Just Screen.Menu.ContinueGame ->
                     let
+                        stats =
+                            model.lastSave.stats
+
+                        updatedStats =
+                            { stats | continues = stats.continues + 1 }
+
                         ( game, gameCmd ) =
-                            Screen.Game.init model.mobile (model.lastSave.level - 1) model.lastSave.stats
+                            Screen.Game.init model.mobile (model.lastSave.level - 1) updatedStats
                     in
                     ( { model | screen = GameScreen game }
-                    , Cmd.map GameMsg gameCmd
+                    , Cmd.batch
+                        [ Cmd.map GameMsg gameCmd
+                        , saveGame { level = model.lastSave.level, stats = updatedStats }
+                        ]
                     )
 
                 Just Screen.Menu.ActivateCheats ->
