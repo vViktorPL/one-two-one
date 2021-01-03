@@ -77,7 +77,7 @@ update msg model =
                     )
 
                 ( _, _, Screen.Game.GameFinished stats ) ->
-                    ( { model | screen = CongratulationsScreen Screen.Congratulations.init, lastLevel = 0 }
+                    ( { model | screen = CongratulationsScreen stats, lastLevel = 0 }
                     , saveGame 0
                     )
 

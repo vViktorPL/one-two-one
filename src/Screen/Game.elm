@@ -1,4 +1,4 @@
-module Screen.Game exposing (Game, Msg, MsgOut(..), init, subscriptions, update, view)
+module Screen.Game exposing (FinalStats, Game, Msg, MsgOut(..), init, subscriptions, update, view)
 
 import Angle
 import Axis3d
@@ -42,6 +42,13 @@ type Game
         }
 
 
+type alias FinalStats =
+    { totalMoves : Int
+    , totalFails : Int
+    , totalTime : Int
+    }
+
+
 type Msg
     = AnimationTick Float
     | KeyDown String
@@ -53,7 +60,7 @@ type Msg
 type MsgOut
     = NoOp
     | SaveGame Int
-    | GameFinished { totalMoves : Int, totalFails : Int, totalTime : Int }
+    | GameFinished FinalStats
 
 
 getTimerSecs : Game -> Int
