@@ -1,4 +1,4 @@
-module Screen.Game exposing (FinalStats, Game, Msg, MsgOut(..), init, subscriptions, update, view)
+module Screen.Game exposing (Game, Msg, MsgOut(..), Stats, init, initStats, subscriptions, update, view)
 
 import Angle
 import Axis3d
@@ -32,9 +32,7 @@ type Game
         , level : Level
         , levelsLeft : List Level
         , currentLevelNumber : Int
-        , totalMoves : Int
-        , totalFails : Int
-        , accumulatedTime : Int
+        , stats : Stats
         , currentLevelTimestamp : Maybe Int
         , currentTimestamp : Int
         , control : Maybe Direction
@@ -42,10 +40,11 @@ type Game
         }
 
 
-type alias FinalStats =
-    { totalMoves : Int
-    , totalFails : Int
-    , totalTime : Int
+type alias Stats =
+    { moves : Int
+    , fails : Int
+    , time : Int
+    , continues : Int
     }
 
 
@@ -59,22 +58,36 @@ type Msg
 
 type MsgOut
     = NoOp
-    | SaveGame Int
-    | GameFinished FinalStats
+    | SaveGame Int Stats
+    | GameFinished Stats
 
 
 getTimerSecs : Game -> Int
-getTimerSecs (Game { accumulatedTime, currentLevelTimestamp, currentTimestamp }) =
+getTimerSecs (Game { stats, currentLevelTimestamp, currentTimestamp }) =
     case currentLevelTimestamp of
         Just startTimestamp ->
-            accumulatedTime + (currentTimestamp - startTimestamp)
+            stats.time + (currentTimestamp - startTimestamp)
 
         Nothing ->
-            accumulatedTime
+            stats.time
 
 
-init : Bool -> Int -> ( Game, Cmd Msg )
-init mobile levelStartIndex =
+initStats : Stats
+initStats =
+    { moves = 0
+    , fails = 0
+    , time = 0
+    , continues = 0
+    }
+
+
+bumpFails : Stats -> Stats
+bumpFails stats =
+    { stats | fails = stats.fails + 1 }
+
+
+init : Bool -> Int -> Stats -> ( Game, Cmd Msg )
+init mobile levelStartIndex stats =
     let
         levels =
             (LevelIndex.firstLevel :: LevelIndex.restLevels)
@@ -93,9 +106,7 @@ init mobile levelStartIndex =
         , level = level
         , levelsLeft = levelsLeft
         , currentLevelNumber = levelStartIndex + 1
-        , totalMoves = 0
-        , totalFails = 0
-        , accumulatedTime = 0
+        , stats = stats
         , currentLevelTimestamp = Nothing
         , currentTimestamp = 0
         , control = Nothing
@@ -119,26 +130,35 @@ update : Msg -> Game -> ( Game, Cmd Msg, MsgOut )
 update msg (Game game) =
     case msg of
         TimerTick time ->
-            ( Game { game | currentTimestamp = Time.posixToMillis time // 1000 }, Cmd.none, NoOp )
+            ( Game { game | currentTimestamp = Time.posixToMillis time // 1000 }
+            , Cmd.none
+            , NoOp
+            )
 
         StartLevelTimer time ->
             let
                 timestamp =
                     Time.posixToMillis time // 1000
             in
-            ( Game { game | currentLevelTimestamp = Just timestamp, currentTimestamp = timestamp }, Cmd.none, NoOp )
+            ( Game { game | currentLevelTimestamp = Just timestamp, currentTimestamp = timestamp }
+            , Cmd.none
+            , NoOp
+            )
 
         AnimationTick delta ->
             let
                 controlledPlayer =
                     controlPlayer game.control game.player
 
-                totalMoves =
+                lastStats =
+                    game.stats
+
+                updatedStats =
                     if controlledPlayer == game.player then
-                        game.totalMoves
+                        lastStats
 
                     else
-                        game.totalMoves + 1
+                        { lastStats | moves = lastStats.moves + 1 }
 
                 ( animatedPlayer, playerCmd ) =
                     controlledPlayer
@@ -154,7 +174,7 @@ update msg (Game game) =
             in
             case interactionMsg of
                 Player.InternalUpdate ->
-                    ( Game { game | player = updatedPlayer, level = updatedLevel, totalMoves = totalMoves }, playerCmd, NoOp )
+                    ( Game { game | player = updatedPlayer, level = updatedLevel, stats = updatedStats }, playerCmd, NoOp )
 
                 Player.FinishedLevel ->
                     case game.levelsLeft of
@@ -165,23 +185,18 @@ update msg (Game game) =
                                     , level = nextLevel
                                     , levelsLeft = rest
                                     , currentLevelNumber = game.currentLevelNumber + 1
-                                    , accumulatedTime = getTimerSecs (Game game)
                                     , currentLevelTimestamp = Nothing
                                     , control = Nothing
                                     , mobile = game.mobile
                                 }
                             , Cmd.batch [ playerCmd, Task.perform StartLevelTimer Time.now ]
-                            , SaveGame (List.length LevelIndex.restLevels - List.length rest)
+                            , SaveGame (game.currentLevelNumber + 1) game.stats
                             )
 
                         [] ->
-                            ( Game
-                                { game
-                                    | accumulatedTime = getTimerSecs (Game game)
-                                    , currentLevelTimestamp = Nothing
-                                }
+                            ( Game { game | currentLevelTimestamp = Nothing }
                             , playerCmd
-                            , GameFinished { totalMoves = game.totalMoves, totalFails = game.totalFails, totalTime = getTimerSecs (Game game) }
+                            , GameFinished game.stats
                             )
 
                 Player.PushDownTile zOffset ->
@@ -227,7 +242,7 @@ update msg (Game game) =
                         { game
                             | player = updatedPlayer
                             , level = Level.restart game.level
-                            , totalFails = game.totalFails + 1
+                            , stats = bumpFails game.stats
                         }
                     , playerCmd
                     , NoOp
@@ -261,7 +276,7 @@ update msg (Game game) =
 
 
 view : ( Int, Int ) -> Game -> Html Msg
-view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, totalMoves, totalFails }) as game) =
+view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, stats }) as game) =
     let
         zoomOut =
             max (800 / toFloat width) 1
@@ -287,9 +302,9 @@ view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, total
             "LVL_"
                 ++ String.fromInt currentLevelNumber
                 ++ " MOV_"
-                ++ String.fromInt totalMoves
+                ++ String.fromInt stats.moves
                 ++ " ERR_"
-                ++ String.fromInt totalFails
+                ++ String.fromInt stats.fails
                 ++ " TIM_"
                 ++ String.fromInt (getTimerSecs game)
     in

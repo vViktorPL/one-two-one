@@ -19,16 +19,26 @@ if (audioContext) {
   alert("Unfortunately, no audio support for your browser :-(");
 }
 
+const defaultSaveState = {
+  level: 1,
+  stats: {
+    moves: 0,
+    fails: 0,
+    time: 0,
+    continues: 0,
+  },
+};
+
 const app = Elm.Main.init({
   node: document.getElementById('app'),
   flags: {
     mobile: 'ontouchstart' in document.documentElement,
-    lastLevel: parseInt(window.localStorage?.getItem("lastLevel") || "0")
+    lastSave: JSON.parse(window.localStorage?.getItem("lastSave") || JSON.stringify(defaultSaveState)),
   },
 });
 
-app.ports.saveGame.subscribe(lastLevel => {
-  localStorage?.setItem("lastLevel", String(lastLevel));
+app.ports.saveGame.subscribe(saveState => {
+  localStorage?.setItem("lastSave", JSON.stringify(saveState));
 });
 
 app.ports.playSound.subscribe(filename => {
