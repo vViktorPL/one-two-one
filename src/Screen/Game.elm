@@ -10,6 +10,7 @@ import Duration exposing (Duration)
 import Html exposing (Html)
 import Html.Attributes exposing (style)
 import Html.Events as Event
+import Html.Lazy
 import Json.Decode as Decode
 import Length
 import Pixels
@@ -337,16 +338,21 @@ view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, stats
                     statsString
                 )
             ]
-        , Scene3d.sunny
-            { entities = [ Player.view player, Level.view level ]
-            , camera = camera
-            , upDirection = Direction3d.z
-            , sunlightDirection = Direction3d.xz (Angle.degrees -120)
-            , background = Scene3d.transparentBackground
-            , clipDepth = Length.centimeters 1
-            , shadows = True
-            , dimensions = ( Pixels.int width, Pixels.int height )
-            }
+        , Html.Lazy.lazy2
+            (\playerModel levelModel ->
+                Scene3d.sunny
+                    { entities = [ Player.view playerModel, Level.view levelModel ]
+                    , camera = camera
+                    , upDirection = Direction3d.z
+                    , sunlightDirection = Direction3d.xz (Angle.degrees -120)
+                    , background = Scene3d.transparentBackground
+                    , clipDepth = Length.centimeters 1
+                    , shadows = True
+                    , dimensions = ( Pixels.int width, Pixels.int height )
+                    }
+            )
+            player
+            level
         , if mobile then
             mobileControls player
 
