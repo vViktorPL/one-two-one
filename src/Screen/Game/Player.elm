@@ -468,7 +468,7 @@ view player =
     let
         blocks =
             List.map
-                (Scene3d.block (Material.metal { baseColor = Color.orange, roughness = 2.5 }))
+                (Scene3d.blockWithShadow (Material.metal { baseColor = Color.orange, roughness = 2.5 }))
                 (getBlocks player)
     in
     case player of

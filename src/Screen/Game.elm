@@ -324,7 +324,7 @@ view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, stats
             , style "top" "0"
             , style "left" "0"
             , style "right" "0"
-            , style "color" "black"
+            , style "color" "white"
             , style "font-size" "25px"
             , style "text-align" "center"
             , style "white-space" "pre"
@@ -341,10 +341,10 @@ view ( width, height ) ((Game { player, level, mobile, currentLevelNumber, stats
             { entities = [ Player.view player, Level.view level ]
             , camera = camera
             , upDirection = Direction3d.z
-            , sunlightDirection = Direction3d.yz (Angle.degrees -120)
+            , sunlightDirection = Direction3d.xz (Angle.degrees -120)
             , background = Scene3d.transparentBackground
             , clipDepth = Length.centimeters 1
-            , shadows = False
+            , shadows = True
             , dimensions = ( Pixels.int width, Pixels.int height )
             }
         , if mobile then
@@ -372,8 +372,6 @@ mobileControls player =
         , style "width" "30vw"
         , style "height" "30vw"
         , style "font-size" "10vw"
-        , style "user-select" "none"
-        , style "-webkit-user-select" "none"
         ]
         [ Html.div
             [ onTouchStart (KeyDown "ArrowUp")
